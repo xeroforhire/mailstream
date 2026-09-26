@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Email as a scrollable feed, with filters that learn what you do not want.">
+<title>Mailstream</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#EEF0F5; --card:#FFFFFF; --ink:#141925; --muted:#5C6478; --line:#D9DDE7;
+  --accent:#2F55D4; --accent-soft:#E3E9FC; --stamp:#C23B26; --stamp-soft:#FBE7E3;
+  --ok:#1F7A4D; --ok-soft:#DFF3E8; --shadow:0 1px 2px rgba(20,25,37,.06),0 8px 24px rgba(20,25,37,.06);
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--paper:#0F131B;--card:#181E2A;--ink:#E7EAF2;--muted:#98A1B6;--line:#2A3243;
+  --accent:#7C9BFF;--accent-soft:#1F2A4A;--stamp:#FF8A73;--stamp-soft:#3A1F1B;--ok:#6FD3A0;--ok-soft:#173226;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--paper:#0F131B;--card:#181E2A;--ink:#E7EAF2;--muted:#98A1B6;--line:#2A3243;
+  --accent:#7C9BFF;--accent-soft:#1F2A4A;--stamp:#FF8A73;--stamp-soft:#3A1F1B;--ok:#6FD3A0;--ok-soft:#173226;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font-size:14px;-webkit-text-size-adjust:100%}
+img{max-width:100%}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font-family:var(--display);padding-inline:16px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:620px;margin:0 auto;padding-block:0 120px}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);margin-inline:-16px;padding:14px 16px 0;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;max-width:620px;margin:0 auto}
+.brand h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:0}
+.brand h1 span{color:var(--accent)}
+.brand small{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+nav.tabs{display:flex;gap:4px;max-width:620px;margin:10px auto 0;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;padding:10px 12px 12px;font-size:14px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;display:flex;gap:6px;align-items:center}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.count{font-family:var(--mono);font-size:11px;background:var(--line);color:var(--ink);border-radius:99px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.demo-note{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:14px 0 0;line-height:1.5}
+
+.feed{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+.post{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;transition:opacity .28s,transform .28s,max-height .35s}
+.post.leaving{opacity:0;transform:translateX(40px) scale(.98)}
+.post-head{display:flex;gap:12px;align-items:center;padding:16px 16px 10px}
+.avatar{flex:none;width:46px;height:46px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:17px;color:#fff;letter-spacing:.02em;position:relative}
+.avatar::after{content:"";position:absolute;inset:-4px;border:1.5px dashed var(--line);border-radius:13px}
+.who{min-width:0;flex:1}
+.who b{display:block;font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who .addr{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.when{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex:none;align-self:flex-start;padding-top:3px}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:4px;margin-left:6px;vertical-align:1px}
+.tag.trusted{background:var(--ok-soft);color:var(--ok)}
+.subject{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.25;margin:2px 16px 10px;text-wrap:balance}
+.banner{margin:0 16px 12px;border-radius:10px;padding:22px 18px;color:#fff;min-height:120px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+.banner strong{font-size:28px;line-height:1.05;letter-spacing:-.02em}
+.banner span{font-family:var(--mono);font-size:12px;opacity:.9}
+.open-area{cursor:pointer;display:flex;flex-direction:column;border-radius:14px 14px 0 0}
+.open-area:hover .subject{color:var(--accent)}
+.preview{font-family:var(--serif);font-size:16px;line-height:1.55;margin:0 16px;color:var(--ink)}
+.preview .tap{font-family:var(--display);font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px;vertical-align:1px}
+.post.read .subject{font-weight:500}
+/* full-email reader */
+.reader{position:fixed;inset:0;z-index:8;background:var(--paper);overflow-y:auto;padding:env(safe-area-inset-top,0px) 16px calc(90px + env(safe-area-inset-bottom,0px))}
+.reader-in{max-width:620px;margin:0 auto}
+.reader-bar{position:sticky;top:0;background:var(--paper);display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);z-index:1}
+.reader-bar button{background:none;border:0;display:flex;align-items:center;gap:6px;font-size:15px;font-weight:500;color:var(--accent);padding:6px 4px}
+.reader .post-head{padding:18px 0 8px}
+.reader .subject{font-size:24px;margin:6px 0 14px}
+.reader .banner{margin:0 0 16px}
+.fullbody{font-family:var(--serif);font-size:17.5px;line-height:1.7;white-space:pre-line;max-width:65ch}
+.reader .actions{position:fixed;left:0;right:0;bottom:0;background:var(--card);margin:0;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -4px 20px rgba(0,0,0,.08)}
+.reader .actions>div{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);width:100%}
+.reader .actions{display:block}
+.reader .slot{margin-top:20px}
+.reader .composer{border:1px solid var(--line);border-radius:12px}
+body.locked{overflow:hidden}
+.actions{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin-top:14px}
+.actions button{background:none;border:0;padding:13px 4px;font-size:13.5px;font-weight:500;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px}
+.actions button:hover{background:var(--paper);color:var(--ink)}
+.actions button.spam:hover{color:var(--stamp);background:var(--stamp-soft)}
+.actions svg{width:17px;height:17px;flex:none}
+@media (max-width:440px){.actions svg{display:none}.actions button{font-size:13px}}
+@media (max-width:340px){.actions button span{font-size:12px}}
+.composer{border-top:1px solid var(--line);padding:12px 16px 16px;display:flex;flex-direction:column;gap:8px;background:var(--paper)}
+.composer label{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.composer textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;padding:10px;font:16px/1.5 var(--serif);background:var(--card);color:var(--ink);resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 14px;font-size:13.5px;font-weight:500}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0F131B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#0F131B}}
+
+/* compact rows for Filtered / Spam */
+.slim{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.slim .avatar{width:36px;height:36px;font-size:14px;border-radius:8px}
+.slim .avatar::after{display:none}
+.slim .t{min-width:0}
+.slim .t b{font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slim .t em{font-style:normal;font-size:13px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reason{grid-column:1/-1;font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.5;border-top:1px dashed var(--line);padding-top:8px}
+.reason mark{background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:0 4px}
+.slim.spamrow .reason mark{background:var(--stamp-soft);color:var(--stamp)}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{font-size:16px;margin:0 0 4px}
+.panel p.hint{margin:0 0 12px;color:var(--muted);font-size:13.5px;line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 6px 4px 11px;font-family:var(--mono);font-size:12px;background:var(--paper)}
+.chip .w{color:var(--muted);font-variant-numeric:tabular-nums}
+.chip button{border:0;background:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--muted);padding:0}
+.chip button:hover{background:var(--line);color:var(--ink)}
+.chip.fam{border-color:var(--stamp-soft)}
+.empty{color:var(--muted);font-size:13.5px;font-style:italic;font-family:var(--serif)}
+.caughtline{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:4px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.endcap{text-align:center;color:var(--muted);font-family:var(--serif);font-style:italic;padding:28px 0 8px}
+
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:6;background:var(--ink);color:var(--paper);border:0;border-radius:99px;padding:12px 20px;font-weight:500;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:7;background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:12px;padding:12px 14px;font-size:13.5px;width:min(560px,calc(100vw - 32px));display:flex;gap:12px;align-items:center;line-height:1.4}
+.toast p{margin:0;flex:1}
+.toast button{border:0;background:none;color:var(--accent);font-weight:700}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><h1>Mail<span>stream</span></h1><small>Prototype · sample mail</small></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="feed" aria-selected="true">Feed <span class="count" id="c-feed">0</span></button>
+    <button role="tab" data-tab="filtered" aria-selected="false">Filtered <span class="count" id="c-filtered">0</span></button>
+    <button role="tab" data-tab="spam" aria-selected="false">Spam <span class="count" id="c-spam">0</span></button>
+    <button role="tab" data-tab="rules" aria-selected="false">What it learned</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <p class="demo-note" id="note">Tap a card to open the full email. Try it: mark the Northline sale as Spam and watch its sister addresses leave too. Tap "Not interested" on a promo, then pull in new mail to see the topic filter work.</p>
+  <section id="view" class="feed" aria-live="polite"></section>
+</main>
+
+<button class="fab" id="fab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg><span id="fabtxt">Pull in new mail</span></button>
+<div class="reader" id="reader" hidden role="dialog" aria-modal="true" aria-label="Email"></div>
+<div class="toast" id="toast" hidden><p id="toastmsg"></p><button id="undo">Undo</button></div>
+
+<script>
+/* ---------- Sample mail (fictional senders) ---------- */
+const INITIAL = [
+ {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",when:"12m",subject:"Practice moved to Thursday",
+  body:"Hey! Quick heads up, the church hall is booked Wednesday so we're moving rehearsal to Thursday at 6:30.\n\nCan you bring the extra cables and the setlist printouts? The kids want to run the new arrangement twice before Sunday.\n\nThanks,\nDana"},
+ {from:"Northline Outfitters",addr:"deals@news.northline.com",when:"38m",subject:"48-hour flash sale: 40% off outerwear",
+  banner:{t:"40% OFF",s:"Outerwear · ends Sunday midnight",c:"#1E3A5F"},
+  body:"Cold mornings are coming. For the next 48 hours only, take 40% off every jacket, fleece and parka in the store. Limited time. Free shipping on orders over $75.\n\nShop the flash sale before it's gone. Use code FROST40 at checkout."},
+ {from:"Printwell Press",addr:"orders@printwellpress.com",when:"1h",subject:"Your proof for Issue II is ready",
+  body:"Your digital proof for order #PW-20931 is ready for review.\n\nPlease check trim marks, bleed and the spine text. Approve the proof within 5 business days to keep your print slot. If you request changes, a revised proof will be generated within 24 hours."},
+ {from:"The Margin",addr:"letters@themargin.pub",when:"2h",subject:"Why serialized fiction is having a moment",
+  body:"This week: readers are back to waiting. From weekly web serials to comic subscriptions, audiences are choosing the slow drip over the binge.\n\nWe talked to four independent creators about building a release rhythm, what keeps readers returning, and why the cliffhanger never really died."},
+ {from:"Crestmark Rewards",addr:"rewards@crestmark-mail.com",when:"3h",subject:"You've earned 500 bonus points (limited time)",
+  banner:{t:"+500 pts",s:"Redeem before Oct 4",c:"#6B2F8A"},
+  body:"Great news, member! You have 500 bonus points waiting. Redeem today for exclusive offers and limited time deals. Don't miss out, points expire soon.\n\nClaim your bonus now and unlock even more rewards this month."},
+ {from:"Marcus Lee",addr:"marcus@studiolee.co",when:"5h",subject:"Cover art, round 2",
+  body:"Attached are three directions for the cover. I pushed the red sky further on option B like you asked and pulled the logo up so it clears the barcode area.\n\nLet me know which one you want to take to final and I'll clean up the linework this week."},
+ {from:"SoundCheck Weekly",addr:"weekly@soundcheck.fm",when:"7h",subject:"Budget in-ear monitors that actually work",
+  body:"Running a small band on a small budget? We tested six wireless in-ear systems under $300 in a real rehearsal room.\n\nPlus: how to set a monitor mix for young players who can't hear themselves over the drummer."},
+ {from:"Prize Center",addr:"claim-now@prize-center-alerts.biz",when:"9h",subject:"CONGRATULATIONS! You've been selected",
+  body:"Dear Winner, you have been selected to receive an exclusive reward. Act now to claim your prize. This limited time offer requires verification of your account details within 24 hours."},
+ {from:"Northline Outfitters",addr:"hello@northlineoutfitters.com",when:"11h",subject:"New arrivals you'll love",
+  banner:{t:"Just landed",s:"Fall knits · trail boots",c:"#2D5A4A"},
+  body:"Fresh for fall: chunky knits, waterproof trail boots and our warmest flannel yet. Members get early access plus free shipping this week only."},
+ {from:"DeployBay",addr:"notifications@deploybay.dev",when:"14h",subject:"Build succeeded: reading-room (main)",
+  body:"Your deployment finished in 38s.\n\nCommit: \"Fix page-turn on mobile Safari\"\nPreview and production URLs have been updated. No errors reported."},
+];
+const INCOMING = [
+ {from:"Northline Deals",addr:"offers@e.northline-mail.com",when:"now",subject:"Final hours: extra 20% off sale items",
+  banner:{t:"EXTRA 20%",s:"Sale ends tonight",c:"#1E3A5F"},
+  body:"Last chance! Take an extra 20% off already-reduced outerwear. Flash sale ends at midnight. Limited time, free shipping over $75."},
+ {from:"Glowfield Home",addr:"sale@glowfield.shop",when:"now",subject:"Flash sale: 50% off everything, limited time",
+  banner:{t:"50% OFF",s:"Everything · 48 hours",c:"#A4481C"},
+  body:"Our biggest flash sale of the year. Take 50% off everything for 48 hours only. Limited time. Free shipping on orders over $50, shop now before it's gone."},
+ {from:"Crestmark Rewards",addr:"points@crestmarkrewards.com",when:"now",subject:"Your bonus points expire Sunday",
+  body:"Reminder: your bonus points expire soon. Redeem for exclusive offers and limited time deals before Sunday. Claim your bonus now."},
+ {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",when:"now",subject:"Re: Practice moved to Thursday",
+  body:"Perfect, thank you. I'll have the kids set up by 6:15 so we can start on time. See you then!"},
+ {from:"The Margin",addr:"letters@themargin.pub",when:"now",subject:"The economics of the indie comic",
+  body:"Print runs, crowdfunding, and the quiet math behind a sustainable indie comic. Three creators open their books and walk through what an issue really costs to make."},
+ {from:"Printwell Press",addr:"orders@printwellpress.com",when:"now",subject:"Order #PW-20931 has shipped",
+  body:"Good news, your order is on its way. Tracking will update within 24 hours. Estimated delivery: 3 to 5 business days."},
+];
+
+/* ---------- State ---------- */
+let uid=0;
+const mk=m=>({...m,id:++uid,state:"feed",reason:null,read:false});
+const PREVIEW_CHARS=160; // how much of the email shows on the card
+let mail=INITIAL.map(mk);
+let learned={families:[],terms:{},trusted:[]}; // families:[{key,label,example,caught:[addr]}]
+try{const s=JSON.parse(localStorage.getItem("mailstream-rules")||"null");if(s&&s.terms)learned=s;}catch(e){}
+const save=()=>{try{localStorage.setItem("mailstream-rules",JSON.stringify(learned))}catch(e){}};
+let tab="feed", pulled=false, undoFn=null, toastT=null;
+
+/* ---------- Sender family detection ---------- */
+const MULTI=["co.uk","com.au","co.jp","com.br"];
+const NOISE=["mail","email","news","newsletter","info","deals","offers","promo","shop","store","hq","app","rewards","team","updates","notify","notifications","official","inc","co"];
+function rootDomain(addr){
+  const d=addr.split("@")[1].toLowerCase().split(".");
+  const two=d.slice(-2).join(".");
+  return MULTI.includes(two)?d.slice(-3).join("."):two;
+}
+const FREEMAIL=new Set(["gmail.com","googlemail.com","outlook.com","hotmail.com","live.com","yahoo.com","icloud.com","me.com","aol.com","proton.me","protonmail.com"]);
+const isFree=addr=>FREEMAIL.has(addr.split("@")[1].toLowerCase());
+function brandKey(addr){
+  if(isFree(addr)) return addr.toLowerCase(); // a personal address is its own family
+  let label=rootDomain(addr).split(".")[0];
+  let parts=label.split(/[-_]/).filter(p=>!NOISE.includes(p));
+  let k=(parts.join("")||label);
+  NOISE.forEach(n=>{ if(k.length>n.length+3 && k.endsWith(n)) k=k.slice(0,-n.length); if(k.length>n.length+3 && k.startsWith(n)) k=k.slice(n.length); });
+  return k;
+}
+function nameKey(name){return (name.toLowerCase().split(/\s+/)[0]||"").replace(/[^a-z0-9]/g,"")}
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function familyMatch(m){
+  const k=brandKey(m.addr), nk=nameKey(m.from);
+  for(const f of learned.families){
+    if(k===f.key) return {f,why:`same brand domain as ${f.example}`};
+    if(isFree(m.addr)||f.key.includes("@")) continue;
+    const short=k.length<f.key.length?k:f.key, long=short===k?f.key:k;
+    if(short.length>=5 && long.startsWith(short)) return {f,why:`"${m.addr.split("@")[1]}" is a variant of ${f.example.split("@")[1]}`};
+    const dist=lev(k,f.key); if(Math.max(k.length,f.key.length)>=6 && dist<=Math.max(1,Math.floor(f.key.length*.15))) return {f,why:`look-alike domain of ${f.example.split("@")[1]}`};
+    if(nk.length>=5 && nk===f.nameKey) return {f,why:`sender name matches "${f.label}"`};
+  }
+  return null;
+}
+
+/* ---------- Topic (keyword) model ---------- */
+const STOP=new Set("the a an and or but for to of in on at by with from your you our we are is was be this that it its as if not no so do can will just all any more most get got have has had than then them they their there here what when who how why about into over under up out off per via re new now also only very each other some such own same too me my us i he she his her was were been being before after while".split(" "));
+function terms(m){
+  const text=(m.subject+" "+m.subject+" "+m.body).toLowerCase().replace(/[^a-z0-9%$ ]+/g," ");
+  const words=text.split(/\s+/).filter(w=>w&&!STOP.has(w)&&(w.length>2||/%/.test(w)));
+  const out={};
+  words.forEach(w=>out[w]=(out[w]||0)+1);
+  for(let i=0;i<words.length-1;i++){const b=words[i]+" "+words[i+1];out[b]=(out[b]||0)+1.5;}
+  return out;
+}
+function learnFrom(m){
+  const t=terms(m);
+  const top=Object.entries(t).filter(([w])=>!/^\d+$/.test(w)).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  top.forEach(([w])=>learned.terms[w]=(learned.terms[w]||0)+1);
+  return top.map(([w])=>w);
+}
+function topicMatch(m){
+  const t=terms(m); const hits=[];
+  let score=0;
+  for(const w in learned.terms){ if(t[w]){ hits.push(w); score+=learned.terms[w]*(w.includes(" ")?2:1); } }
+  return score>=4 && hits.length>=3 ? {hits:hits.sort((a,b)=>(b.includes(" ")-a.includes(" "))).slice(0,4)} : null;
+}
+const isTrusted=m=>learned.trusted.includes(m.addr.toLowerCase());
+
+/* run filters over a message; returns true if pulled */
+function screen(m){
+  if(m.state!=="feed"||isTrusted(m)) return false;
+  const fm=familyMatch(m);
+  if(fm){ m.state="spam"; m.reason={kind:"family",text:fm.why}; if(!fm.f.caught.includes(m.addr))fm.f.caught.push(m.addr); return true; }
+  const tm=topicMatch(m);
+  if(tm){ m.state="filtered"; m.reason={kind:"topic",hits:tm.hits}; return true; }
+  return false;
+}
+
+/* ---------- Rendering ---------- */
+const PALETTE=["#2F55D4","#1F7A4D","#A4481C","#6B2F8A","#1E3A5F","#8A5A00","#B0304F","#2D5A4A","#4B5A7A"];
+function color(addr){let h=0;for(const c of rootDomain(addr))h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length];}
+function initials(n){const p=n.trim().split(/\s+/);return ((p[0]||"")[0]+((p[1]||"")[0]||"")).toUpperCase();}
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ICON={
+ reply:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>',
+ fwd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v5"/></svg>',
+ meh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
+ spam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7v5c0 5 4 8 9 9 5-1 9-4 9-9V7z"/><path d="M12 8v5M12 16h.01"/></svg>'
+};
+function avatar(m){return `<div class="avatar" style="background:${color(m.addr)}" aria-hidden="true">${initials(m.from)}</div>`}
+
+function previewText(b){
+  const flat=b.replace(/\s+/g," ").trim();
+  if(flat.length<=PREVIEW_CHARS) return {t:flat,cut:false};
+  let cut=flat.slice(0,PREVIEW_CHARS); cut=cut.slice(0,cut.lastIndexOf(" ")).replace(/[,.;:!?-]+$/,"");
+  return {t:cut+"…",cut:true};
+}
+function headHTML(m){
+  return `<div class="post-head">${avatar(m)}<div class="who"><b>${esc(m.from)}${isTrusted(m)?'<span class="tag trusted">Trusted</span>':''}</b><span class="addr">${esc(m.addr)}</span></div><span class="when">${m.when}</span></div>`;
+}
+function bannerHTML(m){return m.banner?`<div class="banner" style="background:linear-gradient(135deg,${m.banner.c},${m.banner.c}cc)"><strong>${esc(m.banner.t)}</strong><span>${esc(m.banner.s)}</span></div>`:"";}
+function actionsHTML(){return `<button data-act="reply">${ICON.reply}<span>Reply</span></button>
+     <button data-act="fwd">${ICON.fwd}<span>Forward</span></button>
+     <button data-act="meh">${ICON.meh}<span>Not interested</span></button>
+     <button data-act="spam" class="spam">${ICON.spam}<span>Spam</span></button>`;}
+function postHTML(m){
+  const p=previewText(m.body);
+  return `<article class="post${m.read?" read":""}" data-id="${m.id}">
+   <div class="open-area" data-act="open" role="button" tabindex="0" aria-label="Open email: ${esc(m.subject)}">
+   ${headHTML(m)}
+   <h2 class="subject">${m.read?"":'<span class="dot" aria-label="Unread"></span>'}${esc(m.subject)}</h2>
+   ${bannerHTML(m)}
+   <p class="preview">${esc(p.t)} <span class="tap">${p.cut?"Open email":"Open"}</span></p>
+   </div>
+   <div class="actions">${actionsHTML()}</div>
+   <div class="slot"></div>
+  </article>`;
+}
+function slimHTML(m){
+  const r=m.reason;
+  let why="";
+  if(r?.kind==="family") why=`Blocked sender family: <mark>${esc(r.text)}</mark>`;
+  else if(r?.kind==="topic") why=`Matched muted topics: ${r.hits.map(h=>`<mark>${esc(h)}</mark>`).join(" ")}`;
+  else if(r?.kind==="manual-spam") why=`You marked this as spam`;
+  else if(r?.kind==="manual-meh") why=`You marked this as not interested`;
+  return `<div class="slim ${m.state==="spam"?"spamrow":""}" data-id="${m.id}">${avatar(m)}
+   <div class="t"><b>${esc(m.from)} · <span style="font-weight:400;font-family:var(--mono);font-size:11.5px;color:var(--muted)">${esc(m.addr)}</span></b><em>${esc(m.subject)}</em></div>
+   <button class="btn" data-act="restore">${m.state==="spam"?"Not spam":"Show in feed"}</button>
+   <div class="reason">${why}</div></div>`;
+}
+function rulesHTML(){
+  const fams=learned.families.map((f,i)=>`<div><span class="chip fam">${esc(f.label)} <span class="w">${esc(f.key)}.*</span><button data-rm-fam="${i}" aria-label="Remove ${esc(f.label)}">×</button></span>
+    <div class="caughtline">Catches: ${f.caught.map(esc).join(", ")}</div></div>`).join("");
+  const ts=Object.entries(learned.terms).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span class="chip">${esc(w)} <span class="w">×${n}</span><button data-rm-term="${esc(w)}" aria-label="Remove ${esc(w)}">×</button></span>`).join("");
+  const tr=learned.trusted.map((a,i)=>`<span class="chip">${esc(a)}<button data-rm-trust="${i}" aria-label="Remove ${esc(a)}">×</button></span>`).join("");
+  return `<div class="stack">
+   <div class="panel"><h2>Blocked sender families</h2><p class="hint">Marking one email as spam blocks the whole company: sister domains (news.brand.com, brand-mail.com, brandshop.com), look-alike spellings and matching sender names.</p><div class="stack">${fams||'<p class="empty">Nothing blocked yet.</p>'}</div></div>
+   <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email. New mail that hits several of them goes to Filtered instead of your feed. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
+   <div class="panel"><h2>Trusted senders</h2><p class="hint">Anyone you reply to is trusted and never filtered, so real conversations can't get swept up by a promo rule.</p><div class="chips">${tr||'<p class="empty">Reply to someone to trust them.</p>'}</div></div>
+   <button class="btn" data-act="reset" style="align-self:flex-start">Reset everything</button>
+  </div>`;
+}
+function counts(){
+  ["feed","filtered","spam"].forEach(s=>document.getElementById("c-"+s).textContent=mail.filter(m=>m.state===s).length);
+}
+function render(){
+  const v=document.getElementById("view");
+  document.getElementById("note").hidden = tab!=="feed";
+  if(tab==="rules"){v.innerHTML=rulesHTML();}
+  else{
+    const list=mail.filter(m=>m.state===tab);
+    if(tab==="feed") v.innerHTML=list.map(postHTML).join("")+`<p class="endcap">${list.length?"You're caught up.":"Your feed is clear."}</p>`;
+    else v.innerHTML=list.length?list.map(slimHTML).join(""):`<p class="endcap">${tab==="spam"?"No spam held.":"Nothing filtered yet."}</p>`;
+  }
+  counts();
+  document.getElementById("fab").hidden = pulled || tab!=="feed";
+}
+
+/* ---------- Actions ---------- */
+function toast(msg,undo){
+  const t=document.getElementById("toast");
+  document.getElementById("toastmsg").innerHTML=msg; undoFn=undo||null;
+  document.getElementById("undo").hidden=!undo; t.hidden=false;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,6000);
+}
+const snapshot=()=>JSON.stringify({mail,learned});
+const restoreSnap=s=>{const o=JSON.parse(s);mail=o.mail;learned=o.learned;save();render();};
+function animateOut(ids,done){
+  ids.forEach(id=>document.querySelector(`.post[data-id="${id}"]`)?.classList.add("leaving"));
+  setTimeout(done,matchMedia("(prefers-reduced-motion:reduce)").matches?0:280);
+}
+
+function markSpam(m){
+  const snap=snapshot();
+  m.state="spam"; m.reason={kind:"manual-spam"};
+  let fam=familyMatch(m)?.f;
+  if(!fam){fam={key:brandKey(m.addr),nameKey:nameKey(m.from),label:m.from,example:m.addr,caught:[m.addr]};learned.families.push(fam);}
+  const swept=mail.filter(x=>x!==m && screen(x) && x.state==="spam");
+  save();
+  animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
+    toast(`Moved to Spam and blocked <b>${esc(m.from)}</b>${swept.length?`. Also pulled ${swept.length} more from the same company.`:"."}`,()=>restoreSnap(snap));});
+}
+function markMeh(m){
+  const snap=snapshot();
+  m.state="filtered"; m.reason={kind:"manual-meh"};
+  const learnedTerms=learnFrom(m);
+  const swept=mail.filter(x=>x!==m && x.state==="feed" && screen(x));
+  save();
+  animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
+    toast(`Got it. Muting topics like <b>${learnedTerms.slice(0,3).map(esc).join(", ")}</b>${swept.length?`. ${swept.length} similar email${swept.length>1?"s":""} filtered.`:"."}`,()=>restoreSnap(snap));});
+}
+function openComposer(card,m,kind){
+  const slot=card.querySelector(".slot");
+  if(slot.innerHTML){slot.innerHTML="";return;}
+  slot.innerHTML=`<div class="composer"><label for="c-${m.id}">${kind==="reply"?`Reply to ${esc(m.addr)}`:"Forward to"}</label>
+   ${kind==="fwd"?`<textarea id="to-${m.id}" style="min-height:44px" placeholder="name@example.com"></textarea>`:""}
+   <textarea id="c-${m.id}" placeholder="${kind==="reply"?"Write your reply…":"Add a note (optional)…"}"></textarea>
+   <div class="row"><button class="btn primary" data-act="send" data-kind="${kind}">${kind==="reply"?"Send reply":"Forward"}</button><button class="btn" data-act="cancel">Cancel</button></div></div>`;
+  slot.querySelector("textarea").focus();
+}
+
+const reader=document.getElementById("reader");
+function openReader(m){
+  m.read=true;
+  reader.dataset.id=m.id;
+  reader.innerHTML=`<div class="reader-in"><div class="reader-bar"><button data-act="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to feed</button></div>
+   ${headHTML(m)}<h1 class="subject">${esc(m.subject)}</h1>${bannerHTML(m)}
+   <div class="fullbody">${esc(m.body)}</div><div class="slot"></div></div>
+   <div class="actions"><div>${actionsHTML()}</div></div>`;
+  reader.hidden=false; document.body.classList.add("locked"); reader.scrollTop=0;
+  reader.querySelector('[data-act="close"]').focus();
+  const card=document.querySelector(`.post[data-id="${m.id}"]`);
+  if(card){card.classList.add("read");card.querySelector(".dot")?.remove();}
+}
+function closeReader(){if(reader.hidden)return;const id=reader.dataset.id;reader.hidden=true;reader.innerHTML="";document.body.classList.remove("locked");document.querySelector(`.post[data-id="${id}"] .open-area`)?.focus();}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape") closeReader();
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches(".open-area")){e.preventDefault();e.target.click();}
+});
+reader.addEventListener("click",handleAction);
+document.getElementById("view").addEventListener("click",handleAction);
+function handleAction(e){
+  const b=e.target.closest("button,[data-act=open]"); if(!b) return;
+  if(b.dataset.rmFam!==undefined){learned.families.splice(+b.dataset.rmFam,1);save();render();return;}
+  if(b.dataset.rmTerm!==undefined){delete learned.terms[b.dataset.rmTerm];save();render();return;}
+  if(b.dataset.rmTrust!==undefined){learned.trusted.splice(+b.dataset.rmTrust,1);save();render();return;}
+  const act=b.dataset.act;
+  if(act==="reset"){const snap=snapshot();learned={families:[],terms:{},trusted:[]};uid=0;mail=INITIAL.map(mk);pulled=false;save();render();toast("Reset to the starting sample.",()=>restoreSnap(snap));return;}
+  const host=b.closest("[data-id]"); if(!host) return;
+  if(act==="close"){closeReader();return;}
+  const m=mail.find(x=>x.id==host.dataset.id);
+  if(act==="open"){openReader(m);return;}
+  if(act==="meh"||act==="spam") closeReader();
+  if(act==="reply"||act==="fwd") openComposer(host,m,act);
+  else if(act==="cancel") host.querySelector(".slot").innerHTML="";
+  else if(act==="send"){
+    const kind=b.dataset.kind;
+    if(kind==="reply" && !isTrusted(m)){learned.trusted.push(m.addr.toLowerCase());save();}
+    host.querySelector(".slot").innerHTML="";
+    render();
+    toast(kind==="reply"?`Reply ready. <b>${esc(m.from)}</b> is now trusted and won't be filtered. (This prototype doesn't send real mail.)`:"Forward ready. (This prototype doesn't send real mail.)");
+  }
+  else if(act==="meh") markMeh(m);
+  else if(act==="spam") markSpam(m);
+  else if(act==="restore"){
+    const snap=snapshot();
+    const wasSpam=m.state==="spam";
+    m.state="feed"; m.reason=null;
+    if(!isTrusted(m)) learned.trusted.push(m.addr.toLowerCase());
+    save(); render();
+    toast(`${wasSpam?"Marked not spam":"Back in your feed"}. <b>${esc(m.addr)}</b> will always reach your feed.`,()=>restoreSnap(snap));
+  }
+}
+
+document.querySelector(".tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-tab]"); if(!b) return;
+  tab=b.dataset.tab;
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  render(); window.scrollTo({top:0});
+});
+document.getElementById("fab").addEventListener("click",()=>{
+  pulled=true;
+  const fresh=INCOMING.map(mk);
+  let caught=0; fresh.forEach(m=>{if(screen(m))caught++;});
+  mail=[...fresh,...mail];
+  render(); window.scrollTo({top:0,behavior:"smooth"});
+  const landed=fresh.length-caught;
+  toast(`${fresh.length} new emails. ${landed} reached your feed${caught?`, ${caught} caught by what you've taught it.`:". Teach it with Spam or Not interested, then reset and try again."}`);
+});
+document.getElementById("undo").addEventListener("click",()=>{document.getElementById("toast").hidden=true;if(undoFn)undoFn();});
+
+// apply any saved rules to the starting mail
+mail.forEach(screen);
+render();
+</script>
+</body>
+</html>
