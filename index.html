@@ -78,18 +78,20 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(-
 .reader .banner{margin:0 0 16px}
 .fullbody{font-family:var(--serif);font-size:17.5px;line-height:1.7;white-space:pre-line;max-width:65ch}
 .reader .actions{position:fixed;left:0;right:0;bottom:0;background:var(--card);margin:0;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -4px 20px rgba(0,0,0,.08)}
-.reader .actions>div{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);width:100%}
+.reader .actions>div{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(var(--n,6),1fr);width:100%}
 .reader .actions{display:block}
 .reader .slot{margin-top:20px}
 .reader .composer{border:1px solid var(--line);border-radius:12px}
 body.locked{overflow:hidden}
-.actions{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin-top:14px}
-.actions button{background:none;border:0;padding:13px 4px;font-size:13.5px;font-weight:500;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px}
+.actions{display:grid;grid-template-columns:repeat(var(--n,6),1fr);border-top:1px solid var(--line);margin-top:14px}
+.actions button{background:none;border:0;padding:10px 2px 9px;font-size:11.5px;line-height:1.2;font-weight:500;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;text-align:center}
+.actions button.ok:hover{color:var(--ok);background:var(--ok-soft)}
+.actions button.save:hover,.actions button.save.on{color:#B7791F}
+.actions button.save.on svg{fill:currentColor}
 .actions button:hover{background:var(--paper);color:var(--ink)}
 .actions button.spam:hover{color:var(--stamp);background:var(--stamp-soft)}
-.actions svg{width:17px;height:17px;flex:none}
-@media (max-width:440px){.actions svg{display:none}.actions button{font-size:13px}}
-@media (max-width:340px){.actions button span{font-size:12px}}
+.actions svg{width:20px;height:20px;flex:none}
+@media (max-width:340px){.actions button{font-size:10.5px}}
 .composer{border-top:1px solid var(--line);padding:12px 16px 16px;display:flex;flex-direction:column;gap:8px;background:var(--paper)}
 .composer label{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 .composer textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;padding:10px;font:16px/1.5 var(--serif);background:var(--card);color:var(--ink);resize:vertical}
@@ -124,7 +126,7 @@ body.locked{overflow:hidden}
 .stack{display:flex;flex-direction:column;gap:14px}
 .endcap{text-align:center;color:var(--muted);font-family:var(--serif);font-style:italic;padding:28px 0 8px}
 
-.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:6;background:var(--ink);color:var(--paper);border:0;border-radius:99px;padding:12px 20px;font-weight:500;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:6;background:var(--ink);color:var(--paper);border:0;border-radius:99px;padding:12px 20px;font-weight:500;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center;white-space:nowrap}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:7;background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:12px;padding:12px 14px;font-size:13.5px;width:min(560px,calc(100vw - 32px));display:flex;gap:12px;align-items:center;line-height:1.4}
 .toast p{margin:0;flex:1}
 .toast button{border:0;background:none;color:var(--accent);font-weight:700}
@@ -161,6 +163,7 @@ body[data-screen="landing"] nav.tabs, body[data-screen="landing"] .fab, body[dat
   <div class="brand"><h1>Mail<span>stream</span></h1><button id="acct"></button></div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="feed" aria-selected="true">Feed <span class="count" id="c-feed">0</span></button>
+    <button role="tab" data-tab="saved" aria-selected="false">Saved <span class="count" id="c-saved">0</span></button>
     <button role="tab" data-tab="filtered" aria-selected="false">Filtered <span class="count" id="c-filtered">0</span></button>
     <button role="tab" data-tab="spam" aria-selected="false">Spam <span class="count" id="c-spam">0</span></button>
     <button role="tab" data-tab="rules" aria-selected="false">What it learned</button>
@@ -344,7 +347,7 @@ function fromGmail(g){
   const date=+g.internalDate;
   return mk({gid:g.id,threadId:g.threadId,from:name,addr,subject:H.subject||"(no subject)",date,when:rel(date),
     body,html:out.html||null,hero:out.html?heroImg(out.html):null,preview:decodeEntities(g.snippet),
-    read:!(g.labelIds||[]).includes("UNREAD"),msgId:H["message-id"]||"",refs:H.references||"",replyTo:H["reply-to"]||"",dateHdr:H.date||""});
+    read:!(g.labelIds||[]).includes("UNREAD"),starred:(g.labelIds||[]).includes("STARRED"),msgId:H["message-id"]||"",refs:H.references||"",replyTo:H["reply-to"]||"",dateHdr:H.date||""});
 }
 async function refresh(initial){
   if(busy) return; busy=true; render();
@@ -355,6 +358,14 @@ async function refresh(initial){
     const fresh=got.filter(Boolean).map(fromGmail);
     let caught=0;
     fresh.forEach(m=>{const h=held[m.gid]; if(h){m.state=h.state;m.reason=h.reason;} else if(screen(m)) caught++;});
+    if(initial){ // your saved (starred) emails that are not in the inbox
+      try{
+        const st=await api(`messages?labelIds=STARRED&maxResults=${FETCH_COUNT}`);
+        const sids=(st.messages||[]).map(x=>x.id).filter(id=>!ids.includes(id)&&!mail.some(m=>m.gid===id));
+        const sg=await pool(sids,6,id=>api(`messages/${id}?format=full`));
+        sg.filter(Boolean).forEach(g=>{const m=fromGmail(g); m.state="saved"; m.starred=true; fresh.push(m);});
+      }catch(e){ if(e instanceof AuthError) throw e; }
+    }
     if(initial){ // show what you held back earlier that is no longer in the inbox (for example, moved to Gmail spam)
       Object.entries(held).forEach(([gid,h])=>{ if(!fresh.some(m=>m.gid===gid)) fresh.push(mk({...h,gid,body:"",when:rel(h.date),read:true,stub:true})); });
     }
@@ -418,6 +429,8 @@ function color(addr){let h=0;for(const c of rootDomain(addr))h=(h*31+c.charCodeA
 function initials(n){const p=n.replace(/[^\p{L}\p{N} ]/gu,"").trim().split(/\s+/);return (((p[0]||"?")[0]||"?")+((p[1]||"")[0]||"")).toUpperCase();}
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ICON={
+ ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.7 2.7L16 9.8"/></svg>',
+ star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg>',
  reply:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>',
  fwd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v5"/></svg>',
  meh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
@@ -439,10 +452,17 @@ function bannerHTML(m){
   if(m.hero) return `<img class="hero" src="${esc(m.hero)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`;
   return "";
 }
-function actionsHTML(){return `<button data-act="reply">${ICON.reply}<span>Reply</span></button>
+function actionsHTML(m){
+  if(m.starred&&m.state!=="feed") return `<button data-act="reply">${ICON.reply}<span>Reply</span></button>
+     <button data-act="fwd">${ICON.fwd}<span>Forward</span></button>
+     <button data-act="unsave" class="save on" aria-label="Remove from Saved">${ICON.star}<span>Saved</span></button>`;
+  return `<button data-act="ok" class="ok">${ICON.ok}<span>OK</span></button>
+     <button data-act="save" class="save">${ICON.star}<span>Save</span></button>
+     <button data-act="reply">${ICON.reply}<span>Reply</span></button>
      <button data-act="fwd">${ICON.fwd}<span>Forward</span></button>
      <button data-act="meh">${ICON.meh}<span>Not interested</span></button>
      <button data-act="spam" class="spam">${ICON.spam}<span>Spam</span></button>`;}
+const nActs=m=>(m.starred&&m.state!=="feed")?3:6;
 function postHTML(m){
   const p=previewText(m.preview||m.body);
   return `<article class="post${m.read?" read":""}" data-id="${m.id}">
@@ -452,7 +472,7 @@ function postHTML(m){
    ${bannerHTML(m)}
    <p class="preview">${esc(p.t)} <span class="tap">${p.cut||m.html?"Open email":"Open"}</span></p>
    </div>
-   <div class="actions">${actionsHTML()}</div>
+   <div class="actions" style="--n:${nActs(m)}">${actionsHTML(m)}</div>
    <div class="slot"></div>
   </article>`;
 }
@@ -476,7 +496,7 @@ function rulesHTML(){
   return `<div class="stack">
    <div class="panel"><h2>Blocked sender families</h2><p class="hint">Marking one email as spam blocks the whole company: sister domains (news.brand.com, brand-mail.com, brandshop.com), look-alike spellings and matching sender names.${mode==="gmail"?" The email you tap moves to Gmail's Spam folder. Others from that company are held here and left alone in Gmail.":""}</p><div class="stack">${fams||'<p class="empty">Nothing blocked yet.</p>'}</div></div>
    <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email. New mail that hits several of them goes to Filtered instead of your feed. Nothing changes in Gmail. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
-   <div class="panel"><h2>Trusted senders</h2><p class="hint">Anyone you reply to is trusted and never filtered, so real conversations can't get swept up by a promo rule.</p><div class="chips">${tr||'<p class="empty">Reply to someone to trust them.</p>'}</div></div>
+   <div class="panel"><h2>Trusted senders</h2><p class="hint">Anyone you reply to or save is trusted and never filtered, so real conversations can't get swept up by a promo rule.</p><div class="chips">${tr||'<p class="empty">Reply to someone or save one of their emails to trust them.</p>'}</div></div>
    <p class="hint" style="color:var(--muted);font-size:13px;margin:0">What Mailstream learns is saved in this browser only${mode==="gmail"?`, for ${esc(me)}`:""}.</p>
    <button class="btn" data-act="reset" style="align-self:flex-start">Reset what it learned</button>
   </div>`;
@@ -497,6 +517,7 @@ function landingHTML(err){
 }
 function counts(){
   ["feed","filtered","spam"].forEach(s=>document.getElementById("c-"+s).textContent=mail.filter(m=>m.state===s).length);
+  document.getElementById("c-saved").textContent=mail.filter(m=>m.starred&&m.state!=="feed").length;
 }
 function render(err){
   const v=document.getElementById("view");
@@ -507,7 +528,8 @@ function render(err){
   if(!mode){ v.innerHTML=landingHTML(err); return; }
   if(tab==="rules"){v.innerHTML=rulesHTML();}
   else{
-    const list=mail.filter(m=>m.state===tab);
+    const list=tab==="saved"?mail.filter(m=>m.starred&&m.state!=="feed"):mail.filter(m=>m.state===tab);
+    if(tab==="saved"){ v.innerHTML=list.length?list.map(postHTML).join("")+`<p class="endcap">${mode==="gmail"?"These are your starred emails in Gmail.":"Saved emails stay here."}</p>`:`<p class="endcap">Nothing saved yet. Tap Save on an email to keep it here.</p>`; counts(); document.getElementById("fab").hidden=true; return; }
     if(tab==="feed"){
       if(busy&&!mail.length) v.innerHTML=`<div class="loading"><span class="spin"></span>Loading your inbox…</div>`;
       else v.innerHTML=list.map(postHTML).join("")+`<p class="endcap">${list.length?(mode==="gmail"?`That's your latest ${FETCH_COUNT} inbox emails.`:"You're caught up."):"Your feed is clear."}</p>`;
@@ -552,6 +574,26 @@ function markSpam(m){
   animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
     toast(`Moved to Spam and blocked <b>${esc(m.from)}</b>${swept.length?`. Also held back ${swept.length} more from the same company.`:"."}`,undo);});
   if(mode==="gmail") modify(m.gid,["SPAM"],["INBOX"]).catch(e=>{m.gmailSpam=false;holdRecord(m);save();handleErr(e);});
+}
+function markOk(m){
+  const snap=snapshot();
+  m.state="archived";
+  animateOut([m.id],()=>{render(); toast(mode==="gmail"?"Archived. It's still in Gmail under All Mail.":"Archived.",()=>{restoreSnap(snap); if(mode==="gmail") modify(m.gid,["INBOX"],[]).catch(e=>handleErr(e));});});
+  if(mode==="gmail") modify(m.gid,[],["INBOX"]).catch(e=>{m.state="feed";render();handleErr(e);});
+}
+function markSave(m){
+  const snap=snapshot();
+  m.state="saved"; m.starred=true;
+  const newlyTrusted=!isTrusted(m); if(newlyTrusted){learned.trusted.push(m.addr.toLowerCase());save();}
+  animateOut([m.id],()=>{render(); toast(`Saved${mode==="gmail"?" and starred in Gmail":""}.${newlyTrusted?` <b>${esc(m.from)}</b> is now trusted.`:""} Find it in the Saved tab.`,()=>{restoreSnap(snap); if(mode==="gmail") modify(m.gid,["INBOX"],["STARRED"]).catch(e=>handleErr(e));});});
+  if(mode==="gmail") modify(m.gid,["STARRED"],["INBOX"]).catch(e=>{m.state="feed";m.starred=false;render();handleErr(e);});
+}
+function unsave(m){
+  const snap=snapshot();
+  m.starred=false; m.state="archived";
+  closeReader(); render();
+  toast(mode==="gmail"?"Removed from Saved and unstarred. It's still in Gmail under All Mail.":"Removed from Saved.",()=>{restoreSnap(snap); if(mode==="gmail") modify(m.gid,["STARRED"],[]).catch(e=>handleErr(e));});
+  if(mode==="gmail") modify(m.gid,[],["STARRED"]).catch(e=>handleErr(e));
 }
 function markMeh(m){
   const snap=snapshot();
@@ -622,7 +664,7 @@ function openReader(m){
   reader.innerHTML=`<div class="reader-in"><div class="reader-bar"><button data-act="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to feed</button></div>
    ${headHTML(m)}<h1 class="subject">${esc(m.subject)}</h1>${m.html?"":bannerHTML(m)}
    ${content}<div class="slot"></div></div>
-   <div class="actions"><div>${actionsHTML()}</div></div>`;
+   <div class="actions"><div style="--n:${nActs(m)}">${actionsHTML(m)}</div></div>`;
   if(m.html){
     const f=reader.querySelector("iframe");
     f.addEventListener("load",()=>{try{const d=f.contentDocument;const fit=()=>{f.style.height=d.documentElement.scrollHeight+"px";};fit();new ResizeObserver(fit).observe(d.body);d.querySelectorAll("img").forEach(i=>i.addEventListener("load",fit));}catch(e){f.style.height="70vh";}});
@@ -671,17 +713,20 @@ function handleAction(e){
   if(act==="reset"){
     const snap=snapshot(); learned=blank();
     if(mode==="sample"){uid=0;mail=sampleMail(INITIAL);pulled=false;held={};}
-    else{ held=Object.fromEntries(Object.entries(held).filter(([,h])=>h.gmailSpam)); mail.forEach(m=>{if(!held[m.gid]){m.state="feed";m.reason=null;}}); }
+    else{ held=Object.fromEntries(Object.entries(held).filter(([,h])=>h.gmailSpam)); mail.forEach(m=>{if(!held[m.gid]&&(m.state==="filtered"||m.state==="spam")){m.state="feed";m.reason=null;}}); }
     save(); render(); toast("Cleared what it learned.",()=>restoreSnap(snap)); return;
   }
   const host=b.closest("[data-id]"); if(!host) return;
   if(act==="close"){closeReader();return;}
   const m=mail.find(x=>x.id==host.dataset.id); if(!m) return;
   if(act==="open"){openReader(m);return;}
-  if(act==="meh"||act==="spam") closeReader();
+  if(["meh","spam","ok","save"].includes(act)) closeReader();
   if(act==="reply"||act==="fwd") openComposer(host,m,act);
   else if(act==="cancel") host.querySelector(".slot").innerHTML="";
   else if(act==="send") sendMail(m,b.dataset.kind,host);
+  else if(act==="ok") markOk(m);
+  else if(act==="save") markSave(m);
+  else if(act==="unsave") unsave(m);
   else if(act==="meh") markMeh(m);
   else if(act==="spam") markSpam(m);
   else if(act==="restore"){
