@@ -11,17 +11,25 @@ What makes it different from a regular inbox is that it learns from what you tel
 - **Anyone you reply to is trusted** and never filtered, so a real conversation can't get swept up by a promo rule.
 - **What it learned** shows every blocked company, muted word and trusted sender, and lets you remove any of them. Every action can be undone.
 
-## Status: prototype with sample mail
+## Status: private testing
 
-This version runs on **made-up sample emails**. It does not connect to a real inbox yet, and Reply and Forward don't send anything. It's for testing how the feed and the filters *feel*.
+Mailstream can sign in to a real Gmail account, or run on **made-up sample mail** if you just want to look around.
 
-What it learns is saved in your own browser only. Nobody else sees it, and "Reset everything" on the **What it learned** tab starts over.
+With Gmail connected:
+- The feed shows your latest 40 inbox emails. Opening one marks it read in Gmail.
+- **Reply** and **Forward** really send. Forward sends the text of the email; attachments aren't included yet.
+- **Spam** moves that email to Gmail's Spam folder. Other emails from the same company are held in Mailstream's Spam tab and left alone in Gmail.
+- **Not interested** only changes Mailstream. Nothing moves in Gmail.
+
+**Privacy:** there is no Mailstream server. Your mail goes straight from Google to your browser, and what Mailstream learns is saved in that browser only. Nobody else, including the person who shared the link, can see your email. You can remove Mailstream's access at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+
+Because Mailstream is in private testing, only people added as testers can sign in, and Google will warn that the app "hasn't verified" it. Tap **Advanced**, then **Go to Mailstream**. Sign-in lasts about an hour, then Mailstream asks you to sign in again.
 
 ## Try it
 
-Open `index.html` in any browser, or use the hosted link if one was shared with you. It works best on a phone.
+Open **https://xeroforhire.github.io/mailstream/** on your phone. Sign in with Google, or tap **Try it with sample mail**.
 
-A good first run:
+A good first run with sample mail:
 
 1. Scroll the feed and open a few emails.
 2. Tap **Not interested** on the Northline flash sale.
@@ -39,6 +47,7 @@ A good first run:
 
 ## Roadmap
 
-- Connect a real Gmail inbox
+- Load more than the latest 40 emails as you scroll
+- Forward attachments
 - Turn a Spam tap into a real Gmail filter
 - Eddy, the in-app helper who explains what the filter learned and why

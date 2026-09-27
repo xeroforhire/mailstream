@@ -128,13 +128,37 @@ body.locked{overflow:hidden}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:7;background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:12px;padding:12px 14px;font-size:13.5px;width:min(560px,calc(100vw - 32px));display:flex;gap:12px;align-items:center;line-height:1.4}
 .toast p{margin:0;flex:1}
 .toast button{border:0;background:none;color:var(--accent);font-weight:700}
+
+/* hero image on cards */
+.hero{display:block;margin:0 16px 12px;border-radius:10px;width:calc(100% - 32px);max-height:280px;object-fit:cover;background:var(--line)}
+/* landing */
+body[data-screen="landing"] nav.tabs, body[data-screen="landing"] .fab, body[data-screen="landing"] #acct{display:none!important}
+.landing{display:flex;flex-direction:column;gap:18px;margin-top:28px}
+.landing h2{font-size:34px;line-height:1.05;letter-spacing:-.03em;margin:0;text-wrap:balance}
+.landing h2 em{font-style:normal;color:var(--accent)}
+.landing p{margin:0;font-family:var(--serif);font-size:17px;line-height:1.55;color:var(--ink);max-width:52ch}
+.landing .row .btn{padding:12px 18px;font-size:15px}
+.landing .fine{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--muted);border-top:1px dashed var(--line);padding-top:14px}
+.landing .err{font-family:var(--mono);font-size:12.5px;color:var(--stamp);background:var(--stamp-soft);border-radius:8px;padding:10px 12px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.gbtn{display:inline-flex;align-items:center;gap:10px}
+.gbtn svg{width:18px;height:18px}
+#acct{background:none;border:0;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em;padding:4px 0;text-align:right;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#acct b{color:var(--accent);font-weight:500}
+/* full email as the sender designed it */
+.mailframe{background:#fff;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+.mailframe iframe{display:block;width:100%;border:0;min-height:200px;background:#fff}
+.loading{display:flex;gap:10px;align-items:center;justify-content:center;color:var(--muted);font-family:var(--serif);font-style:italic;padding:40px 0}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.composer .err{font-family:var(--mono);font-size:12px;color:var(--stamp)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body>
+<body data-screen="landing">
 
 <header class="top">
-  <div class="brand"><h1>Mail<span>stream</span></h1><small>Prototype · sample mail</small></div>
+  <div class="brand"><h1>Mail<span>stream</span></h1><button id="acct"></button></div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="feed" aria-selected="true">Feed <span class="count" id="c-feed">0</span></button>
     <button role="tab" data-tab="filtered" aria-selected="false">Filtered <span class="count" id="c-filtered">0</span></button>
@@ -144,7 +168,7 @@ body.locked{overflow:hidden}
 </header>
 
 <main class="wrap">
-  <p class="demo-note" id="note">Tap a card to open the full email. Try it: mark the Northline sale as Spam and watch its sister addresses leave too. Tap "Not interested" on a promo, then pull in new mail to see the topic filter work.</p>
+  <p class="demo-note" id="note" hidden>Tap a card to open the full email. Try it: mark the Northline sale as Spam and watch its sister addresses leave too. Tap "Not interested" on a promo, then pull in new mail to see the topic filter work.</p>
   <section id="view" class="feed" aria-live="polite"></section>
 </main>
 
@@ -152,70 +176,36 @@ body.locked{overflow:hidden}
 <div class="reader" id="reader" hidden role="dialog" aria-modal="true" aria-label="Email"></div>
 <div class="toast" id="toast" hidden><p id="toastmsg"></p><button id="undo">Undo</button></div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-/* ---------- Sample mail (fictional senders) ---------- */
-const INITIAL = [
- {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",when:"12m",subject:"Practice moved to Thursday",
-  body:"Hey! Quick heads up, the church hall is booked Wednesday so we're moving rehearsal to Thursday at 6:30.\n\nCan you bring the extra cables and the setlist printouts? The kids want to run the new arrangement twice before Sunday.\n\nThanks,\nDana"},
- {from:"Northline Outfitters",addr:"deals@news.northline.com",when:"38m",subject:"48-hour flash sale: 40% off outerwear",
-  banner:{t:"40% OFF",s:"Outerwear · ends Sunday midnight",c:"#1E3A5F"},
-  body:"Cold mornings are coming. For the next 48 hours only, take 40% off every jacket, fleece and parka in the store. Limited time. Free shipping on orders over $75.\n\nShop the flash sale before it's gone. Use code FROST40 at checkout."},
- {from:"Printwell Press",addr:"orders@printwellpress.com",when:"1h",subject:"Your proof for Issue II is ready",
-  body:"Your digital proof for order #PW-20931 is ready for review.\n\nPlease check trim marks, bleed and the spine text. Approve the proof within 5 business days to keep your print slot. If you request changes, a revised proof will be generated within 24 hours."},
- {from:"The Margin",addr:"letters@themargin.pub",when:"2h",subject:"Why serialized fiction is having a moment",
-  body:"This week: readers are back to waiting. From weekly web serials to comic subscriptions, audiences are choosing the slow drip over the binge.\n\nWe talked to four independent creators about building a release rhythm, what keeps readers returning, and why the cliffhanger never really died."},
- {from:"Crestmark Rewards",addr:"rewards@crestmark-mail.com",when:"3h",subject:"You've earned 500 bonus points (limited time)",
-  banner:{t:"+500 pts",s:"Redeem before Oct 4",c:"#6B2F8A"},
-  body:"Great news, member! You have 500 bonus points waiting. Redeem today for exclusive offers and limited time deals. Don't miss out, points expire soon.\n\nClaim your bonus now and unlock even more rewards this month."},
- {from:"Marcus Lee",addr:"marcus@studiolee.co",when:"5h",subject:"Cover art, round 2",
-  body:"Attached are three directions for the cover. I pushed the red sky further on option B like you asked and pulled the logo up so it clears the barcode area.\n\nLet me know which one you want to take to final and I'll clean up the linework this week."},
- {from:"SoundCheck Weekly",addr:"weekly@soundcheck.fm",when:"7h",subject:"Budget in-ear monitors that actually work",
-  body:"Running a small band on a small budget? We tested six wireless in-ear systems under $300 in a real rehearsal room.\n\nPlus: how to set a monitor mix for young players who can't hear themselves over the drummer."},
- {from:"Prize Center",addr:"claim-now@prize-center-alerts.biz",when:"9h",subject:"CONGRATULATIONS! You've been selected",
-  body:"Dear Winner, you have been selected to receive an exclusive reward. Act now to claim your prize. This limited time offer requires verification of your account details within 24 hours."},
- {from:"Northline Outfitters",addr:"hello@northlineoutfitters.com",when:"11h",subject:"New arrivals you'll love",
-  banner:{t:"Just landed",s:"Fall knits · trail boots",c:"#2D5A4A"},
-  body:"Fresh for fall: chunky knits, waterproof trail boots and our warmest flannel yet. Members get early access plus free shipping this week only."},
- {from:"DeployBay",addr:"notifications@deploybay.dev",when:"14h",subject:"Build succeeded: reading-room (main)",
-  body:"Your deployment finished in 38s.\n\nCommit: \"Fix page-turn on mobile Safari\"\nPreview and production URLs have been updated. No errors reported."},
-];
-const INCOMING = [
- {from:"Northline Deals",addr:"offers@e.northline-mail.com",when:"now",subject:"Final hours: extra 20% off sale items",
-  banner:{t:"EXTRA 20%",s:"Sale ends tonight",c:"#1E3A5F"},
-  body:"Last chance! Take an extra 20% off already-reduced outerwear. Flash sale ends at midnight. Limited time, free shipping over $75."},
- {from:"Glowfield Home",addr:"sale@glowfield.shop",when:"now",subject:"Flash sale: 50% off everything, limited time",
-  banner:{t:"50% OFF",s:"Everything · 48 hours",c:"#A4481C"},
-  body:"Our biggest flash sale of the year. Take 50% off everything for 48 hours only. Limited time. Free shipping on orders over $50, shop now before it's gone."},
- {from:"Crestmark Rewards",addr:"points@crestmarkrewards.com",when:"now",subject:"Your bonus points expire Sunday",
-  body:"Reminder: your bonus points expire soon. Redeem for exclusive offers and limited time deals before Sunday. Claim your bonus now."},
- {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",when:"now",subject:"Re: Practice moved to Thursday",
-  body:"Perfect, thank you. I'll have the kids set up by 6:15 so we can start on time. See you then!"},
- {from:"The Margin",addr:"letters@themargin.pub",when:"now",subject:"The economics of the indie comic",
-  body:"Print runs, crowdfunding, and the quiet math behind a sustainable indie comic. Three creators open their books and walk through what an issue really costs to make."},
- {from:"Printwell Press",addr:"orders@printwellpress.com",when:"now",subject:"Order #PW-20931 has shipped",
-  body:"Good news, your order is on its way. Tracking will update within 24 hours. Estimated delivery: 3 to 5 business days."},
-];
+/* ---------- Google sign-in settings ---------- */
+const GOOGLE_CLIENT_ID = ""; // paste the OAuth Client ID from Google Cloud here
+const SCOPES = ["https://www.googleapis.com/auth/gmail.modify","https://www.googleapis.com/auth/gmail.send"];
+const FETCH_COUNT = 40;       // how many recent inbox emails to load
+const PREVIEW_CHARS = 160;    // how much of each email shows on its card
 
 /* ---------- State ---------- */
-let uid=0;
-const mk=m=>({...m,id:++uid,state:"feed",reason:null,read:false});
-const PREVIEW_CHARS=160; // how much of the email shows on the card
-let mail=INITIAL.map(mk);
-let learned={families:[],terms:{},trusted:[]}; // families:[{key,label,example,caught:[addr]}]
-try{const s=JSON.parse(localStorage.getItem("mailstream-rules")||"null");if(s&&s.terms)learned=s;}catch(e){}
-const save=()=>{try{localStorage.setItem("mailstream-rules",JSON.stringify(learned))}catch(e){}};
-let tab="feed", pulled=false, undoFn=null, toastT=null;
+const blank=()=>({families:[],terms:{},trusted:[]});
+let mode=null;            // "sample" or "gmail"
+let me="";                // signed-in Gmail address
+let uid=0, mail=[], learned=blank(), held={};
+let tab="feed", pulled=false, busy=false, actionFn=null, toastT=null;
+const mk=m=>({state:"feed",reason:null,read:false,...m,id:++uid});
+const storeKey=k=>`mailstream:${mode==="gmail"?me:"sample"}:${k}`;
+function load(k,d){try{const v=JSON.parse(localStorage.getItem(storeKey(k))||"null");return v??d;}catch(e){return d;}}
+function save(){try{localStorage.setItem(storeKey("rules"),JSON.stringify(learned));localStorage.setItem(storeKey("held"),JSON.stringify(held));}catch(e){}}
 
 /* ---------- Sender family detection ---------- */
 const MULTI=["co.uk","com.au","co.jp","com.br"];
 const NOISE=["mail","email","news","newsletter","info","deals","offers","promo","shop","store","hq","app","rewards","team","updates","notify","notifications","official","inc","co"];
+function domainOf(addr){return (addr.split("@")[1]||addr).toLowerCase();}
 function rootDomain(addr){
-  const d=addr.split("@")[1].toLowerCase().split(".");
+  const d=domainOf(addr).split(".");
   const two=d.slice(-2).join(".");
   return MULTI.includes(two)?d.slice(-3).join("."):two;
 }
 const FREEMAIL=new Set(["gmail.com","googlemail.com","outlook.com","hotmail.com","live.com","yahoo.com","icloud.com","me.com","aol.com","proton.me","protonmail.com"]);
-const isFree=addr=>FREEMAIL.has(addr.split("@")[1].toLowerCase());
+const isFree=addr=>FREEMAIL.has(domainOf(addr));
 function brandKey(addr){
   if(isFree(addr)) return addr.toLowerCase(); // a personal address is its own family
   let label=rootDomain(addr).split(".")[0];
@@ -233,17 +223,17 @@ function familyMatch(m){
     if(k===f.key) return {f,why:`same brand domain as ${f.example}`};
     if(isFree(m.addr)||f.key.includes("@")) continue;
     const short=k.length<f.key.length?k:f.key, long=short===k?f.key:k;
-    if(short.length>=5 && long.startsWith(short)) return {f,why:`"${m.addr.split("@")[1]}" is a variant of ${f.example.split("@")[1]}`};
-    const dist=lev(k,f.key); if(Math.max(k.length,f.key.length)>=6 && dist<=Math.max(1,Math.floor(f.key.length*.15))) return {f,why:`look-alike domain of ${f.example.split("@")[1]}`};
+    if(short.length>=5 && long.startsWith(short)) return {f,why:`"${domainOf(m.addr)}" is a variant of ${domainOf(f.example)}`};
+    const dist=lev(k,f.key); if(Math.max(k.length,f.key.length)>=6 && dist<=Math.max(1,Math.floor(f.key.length*.15))) return {f,why:`look-alike domain of ${domainOf(f.example)}`};
     if(nk.length>=5 && nk===f.nameKey) return {f,why:`sender name matches "${f.label}"`};
   }
   return null;
 }
 
 /* ---------- Topic (keyword) model ---------- */
-const STOP=new Set("the a an and or but for to of in on at by with from your you our we are is was be this that it its as if not no so do can will just all any more most get got have has had than then them they their there here what when who how why about into over under up out off per via re new now also only very each other some such own same too me my us i he she his her was were been being before after while".split(" "));
+const STOP=new Set("the a an and or but for to of in on at by with from your you our we are is was be this that it its as if not no so do can will just all any more most get got have has had than then them they their there here what when who how why about into over under up out off per via re new now also only very each other some such own same too me my us i he she his her was were been being before after while view browser email unsubscribe click here privacy policy reserved rights copyright".split(" "));
 function terms(m){
-  const text=(m.subject+" "+m.subject+" "+m.body).toLowerCase().replace(/[^a-z0-9%$ ]+/g," ");
+  const text=(m.subject+" "+m.subject+" "+(m.body||"").slice(0,3000)).toLowerCase().replace(/[^a-z0-9%$ ]+/g," ");
   const words=text.split(/\s+/).filter(w=>w&&!STOP.has(w)&&(w.length>2||/%/.test(w)));
   const out={};
   words.forEach(w=>out[w]=(out[w]||0)+1);
@@ -264,7 +254,7 @@ function topicMatch(m){
 }
 const isTrusted=m=>learned.trusted.includes(m.addr.toLowerCase());
 
-/* run filters over a message; returns true if pulled */
+/* run filters over a message; returns true if it was held back */
 function screen(m){
   if(m.state!=="feed"||isTrusted(m)) return false;
   const fm=familyMatch(m);
@@ -273,42 +263,194 @@ function screen(m){
   if(tm){ m.state="filtered"; m.reason={kind:"topic",hits:tm.hits}; return true; }
   return false;
 }
+function holdRecord(m){held[m.gid]={state:m.state,reason:m.reason,from:m.from,addr:m.addr,subject:m.subject,date:m.date,gmailSpam:!!m.gmailSpam};}
+
+/* ---------- Gmail ---------- */
+class AuthError extends Error{constructor(){super("Your Google sign-in timed out.");}}
+let token=null, tokenExp=0;
+function getToken(){
+  return new Promise((res,rej)=>{
+    if(!window.google?.accounts?.oauth2) return rej(new Error("Google sign-in didn't load. Check your connection and reload the page."));
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:GOOGLE_CLIENT_ID, scope:SCOPES.join(" "),
+      callback:r=>{
+        if(r.error) return rej(new Error(r.error_description||r.error));
+        if(!google.accounts.oauth2.hasGrantedAllScopes(r,...SCOPES)) return rej(new Error("Mailstream needs both Gmail permissions. Sign in again and leave both boxes ticked."));
+        token=r.access_token; tokenExp=Date.now()+((r.expires_in||3600)-60)*1000; res(token);
+      },
+      error_callback:e=>rej(new Error(e.type==="popup_closed"?"The sign-in window was closed before it finished.":e.type==="popup_failed_to_open"?"Your browser blocked the sign-in window. Allow pop-ups for this site and try again.":"Sign-in didn't finish ("+e.type+")."))
+    });
+    client.requestAccessToken({prompt:"", hint:me||undefined});
+  });
+}
+async function api(path,opts={}){
+  if(!token||Date.now()>tokenExp) throw new AuthError();
+  const r=await fetch("https://gmail.googleapis.com/gmail/v1/users/me/"+path,{...opts,headers:{Authorization:"Bearer "+token,...(opts.body?{"Content-Type":"application/json"}:{})}});
+  if(r.status===401){token=null;throw new AuthError();}
+  if(!r.ok){let msg="Gmail returned an error ("+r.status+").";try{msg=(await r.json()).error.message||msg;}catch(e){} throw new Error(msg);}
+  return r.status===204?null:r.json();
+}
+const modify=(gid,add,remove)=>api(`messages/${gid}/modify`,{method:"POST",body:JSON.stringify({addLabelIds:add,removeLabelIds:remove})});
+async function pool(items,n,fn){const out=new Array(items.length);let i=0;
+  await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(i<items.length){const k=i++;try{out[k]=await fn(items[k]);}catch(e){if(e instanceof AuthError)throw e;out[k]=null;}}}));return out;}
+
+const b64=s=>{const bin=atob(s.replace(/-/g,"+").replace(/_/g,"/"));return new TextDecoder("utf-8").decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));};
+function walk(p,out){
+  if(!p) return;
+  const mt=(p.mimeType||"").toLowerCase();
+  if(p.body?.data && !p.filename){
+    if(mt==="text/plain"&&!out.text) out.text=b64(p.body.data);
+    else if(mt==="text/html"&&!out.html) out.html=b64(p.body.data);
+  }
+  (p.parts||[]).forEach(c=>walk(c,out));
+}
+function htmlDoc(html){return new DOMParser().parseFromString(html,"text/html");}
+function htmlToText(html){
+  const d=htmlDoc(html);
+  d.querySelectorAll("style,script,head,title").forEach(n=>n.remove());
+  d.querySelectorAll("br").forEach(n=>n.replaceWith("\n"));
+  d.querySelectorAll("p,div,tr,li,h1,h2,h3,h4,h5,h6,table,blockquote").forEach(n=>n.append("\n"));
+  return d.body?d.body.textContent:"";
+}
+function cleanText(t){return t.replace(/\r/g,"").replace(/[ \t ‌͏]+/g," ").split("\n").map(l=>l.trim()).join("\n").replace(/\n{3,}/g,"\n\n").trim();}
+function decodeEntities(s){const t=document.createElement("textarea");t.innerHTML=s||"";return t.value;}
+function heroImg(html){
+  const imgs=[...htmlDoc(html).querySelectorAll("img")];
+  for(const im of imgs){
+    const src=im.getAttribute("src")||""; const w=parseInt(im.getAttribute("width")||"0",10), h=parseInt(im.getAttribute("height")||"0",10);
+    if(!/^https:\/\//.test(src)) continue;
+    if(/logo|icon|spacer|pixel|track|open\.|beacon|badge|social|facebook|twitter|instagram|linkedin|youtube/i.test(src+" "+(im.getAttribute("alt")||""))) continue;
+    if((w&&w<250)||(h&&h<120)) continue;
+    if(!w&&!h&&imgs.length>12) continue;
+    return src;
+  }
+  return null;
+}
+function parseAddr(v){
+  const m=(v||"").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/);
+  if(m) return {name:m[1].trim()||m[2].split("@")[0],addr:m[2].trim()};
+  const a=(v||"").trim(); return {name:a.split("@")[0]||"Unknown",addr:a||"unknown@unknown"};
+}
+function rel(ts){
+  const s=(Date.now()-ts)/1000;
+  if(s<60) return "now"; if(s<3600) return Math.floor(s/60)+"m"; if(s<86400) return Math.floor(s/3600)+"h"; if(s<604800) return Math.floor(s/86400)+"d";
+  return new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function fromGmail(g){
+  const H={}; (g.payload?.headers||[]).forEach(h=>H[h.name.toLowerCase()]=h.value);
+  const {name,addr}=parseAddr(H.from);
+  const out={}; walk(g.payload,out);
+  const body=cleanText(out.text?out.text:out.html?htmlToText(out.html):decodeEntities(g.snippet));
+  const date=+g.internalDate;
+  return mk({gid:g.id,threadId:g.threadId,from:name,addr,subject:H.subject||"(no subject)",date,when:rel(date),
+    body,html:out.html||null,hero:out.html?heroImg(out.html):null,preview:decodeEntities(g.snippet),
+    read:!(g.labelIds||[]).includes("UNREAD"),msgId:H["message-id"]||"",refs:H.references||"",replyTo:H["reply-to"]||"",dateHdr:H.date||""});
+}
+async function refresh(initial){
+  if(busy) return; busy=true; render();
+  try{
+    const list=await api(`messages?labelIds=INBOX&maxResults=${FETCH_COUNT}`);
+    const ids=(list.messages||[]).map(x=>x.id).filter(id=>!mail.some(m=>m.gid===id));
+    const got=await pool(ids,6,id=>api(`messages/${id}?format=full`));
+    const fresh=got.filter(Boolean).map(fromGmail);
+    let caught=0;
+    fresh.forEach(m=>{const h=held[m.gid]; if(h){m.state=h.state;m.reason=h.reason;} else if(screen(m)) caught++;});
+    if(initial){ // show what you held back earlier that is no longer in the inbox (for example, moved to Gmail spam)
+      Object.entries(held).forEach(([gid,h])=>{ if(!fresh.some(m=>m.gid===gid)) fresh.push(mk({...h,gid,body:"",when:rel(h.date),read:true,stub:true})); });
+    }
+    mail.forEach(m=>{if(!m.stub)m.when=rel(m.date);});
+    mail=[...fresh,...mail].sort((a,b)=>b.date-a.date);
+    busy=false; render();
+    const landed=fresh.filter(m=>!m.stub&&m.state==="feed").length;
+    if(!initial) toast(ids.length?`${ids.length} new email${ids.length>1?"s":""}. ${landed} reached your feed${caught?`, ${caught} held back by what you've taught it`:""}.`:"No new mail.");
+    else if(caught) toast(`${caught} email${caught>1?"s":""} held back by what you've taught it. Check Filtered and Spam.`);
+  }catch(e){busy=false; render(); handleErr(e,()=>refresh(initial));}
+}
+
+/* ---------- Sample mail (fictional senders) ---------- */
+const now=Date.now(), ago=min=>now-min*60000;
+const INITIAL = [
+ {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",date:ago(12),subject:"Practice moved to Thursday",
+  body:"Hey! Quick heads up, the church hall is booked Wednesday so we're moving rehearsal to Thursday at 6:30.\n\nCan you bring the extra cables and the setlist printouts? The kids want to run the new arrangement twice before Sunday.\n\nThanks,\nDana"},
+ {from:"Northline Outfitters",addr:"deals@news.northline.com",date:ago(38),subject:"48-hour flash sale: 40% off outerwear",
+  banner:{t:"40% OFF",s:"Outerwear · ends Sunday midnight",c:"#1E3A5F"},
+  body:"Cold mornings are coming. For the next 48 hours only, take 40% off every jacket, fleece and parka in the store. Limited time. Free shipping on orders over $75.\n\nShop the flash sale before it's gone. Use code FROST40 at checkout."},
+ {from:"Printwell Press",addr:"orders@printwellpress.com",date:ago(65),subject:"Your proof for Issue II is ready",
+  body:"Your digital proof for order #PW-20931 is ready for review.\n\nPlease check trim marks, bleed and the spine text. Approve the proof within 5 business days to keep your print slot. If you request changes, a revised proof will be generated within 24 hours."},
+ {from:"The Margin",addr:"letters@themargin.pub",date:ago(130),subject:"Why serialized fiction is having a moment",
+  body:"This week: readers are back to waiting. From weekly web serials to comic subscriptions, audiences are choosing the slow drip over the binge.\n\nWe talked to four independent creators about building a release rhythm, what keeps readers returning, and why the cliffhanger never really died."},
+ {from:"Crestmark Rewards",addr:"rewards@crestmark-mail.com",date:ago(190),subject:"You've earned 500 bonus points (limited time)",
+  banner:{t:"+500 pts",s:"Redeem before Oct 4",c:"#6B2F8A"},
+  body:"Great news, member! You have 500 bonus points waiting. Redeem today for exclusive offers and limited time deals. Don't miss out, points expire soon.\n\nClaim your bonus now and unlock even more rewards this month."},
+ {from:"Marcus Lee",addr:"marcus@studiolee.co",date:ago(300),subject:"Cover art, round 2",
+  body:"Attached are three directions for the cover. I pushed the red sky further on option B like you asked and pulled the logo up so it clears the barcode area.\n\nLet me know which one you want to take to final and I'll clean up the linework this week."},
+ {from:"SoundCheck Weekly",addr:"weekly@soundcheck.fm",date:ago(420),subject:"Budget in-ear monitors that actually work",
+  body:"Running a small band on a small budget? We tested six wireless in-ear systems under $300 in a real rehearsal room.\n\nPlus: how to set a monitor mix for young players who can't hear themselves over the drummer."},
+ {from:"Prize Center",addr:"claim-now@prize-center-alerts.biz",date:ago(540),subject:"CONGRATULATIONS! You've been selected",
+  body:"Dear Winner, you have been selected to receive an exclusive reward. Act now to claim your prize. This limited time offer requires verification of your account details within 24 hours."},
+ {from:"Northline Outfitters",addr:"hello@northlineoutfitters.com",date:ago(660),subject:"New arrivals you'll love",
+  banner:{t:"Just landed",s:"Fall knits · trail boots",c:"#2D5A4A"},
+  body:"Fresh for fall: chunky knits, waterproof trail boots and our warmest flannel yet. Members get early access plus free shipping this week only."},
+ {from:"DeployBay",addr:"notifications@deploybay.dev",date:ago(840),subject:"Build succeeded: reading-room (main)",
+  body:"Your deployment finished in 38s.\n\nCommit: \"Fix page-turn on mobile Safari\"\nPreview and production URLs have been updated. No errors reported."},
+];
+const INCOMING = [
+ {from:"Northline Deals",addr:"offers@e.northline-mail.com",subject:"Final hours: extra 20% off sale items",
+  banner:{t:"EXTRA 20%",s:"Sale ends tonight",c:"#1E3A5F"},
+  body:"Last chance! Take an extra 20% off already-reduced outerwear. Flash sale ends at midnight. Limited time, free shipping over $75."},
+ {from:"Glowfield Home",addr:"sale@glowfield.shop",subject:"Flash sale: 50% off everything, limited time",
+  banner:{t:"50% OFF",s:"Everything · 48 hours",c:"#A4481C"},
+  body:"Our biggest flash sale of the year. Take 50% off everything for 48 hours only. Limited time. Free shipping on orders over $50, shop now before it's gone."},
+ {from:"Crestmark Rewards",addr:"points@crestmarkrewards.com",subject:"Your bonus points expire Sunday",
+  body:"Reminder: your bonus points expire soon. Redeem for exclusive offers and limited time deals before Sunday. Claim your bonus now."},
+ {from:"Dana Whitfield",addr:"dana.whitfield@gmail.com",subject:"Re: Practice moved to Thursday",
+  body:"Perfect, thank you. I'll have the kids set up by 6:15 so we can start on time. See you then!"},
+ {from:"The Margin",addr:"letters@themargin.pub",subject:"The economics of the indie comic",
+  body:"Print runs, crowdfunding, and the quiet math behind a sustainable indie comic. Three creators open their books and walk through what an issue really costs to make."},
+ {from:"Printwell Press",addr:"orders@printwellpress.com",subject:"Order #PW-20931 has shipped",
+  body:"Good news, your order is on its way. Tracking will update within 24 hours. Estimated delivery: 3 to 5 business days."},
+];
+const sampleMail=list=>list.map(m=>mk({...m,date:m.date||Date.now(),when:rel(m.date||Date.now())}));
 
 /* ---------- Rendering ---------- */
 const PALETTE=["#2F55D4","#1F7A4D","#A4481C","#6B2F8A","#1E3A5F","#8A5A00","#B0304F","#2D5A4A","#4B5A7A"];
 function color(addr){let h=0;for(const c of rootDomain(addr))h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length];}
-function initials(n){const p=n.trim().split(/\s+/);return ((p[0]||"")[0]+((p[1]||"")[0]||"")).toUpperCase();}
-const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function initials(n){const p=n.replace(/[^\p{L}\p{N} ]/gu,"").trim().split(/\s+/);return (((p[0]||"?")[0]||"?")+((p[1]||"")[0]||"")).toUpperCase();}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ICON={
  reply:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>',
  fwd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v5"/></svg>',
  meh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
- spam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7v5c0 5 4 8 9 9 5-1 9-4 9-9V7z"/><path d="M12 8v5M12 16h.01"/></svg>'
+ spam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7v5c0 5 4 8 9 9 5-1 9-4 9-9V7z"/><path d="M12 8v5M12 16h.01"/></svg>',
+ g:'<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.5 5.8c4.4-4 6.8-10 6.8-17.2z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>'
 };
-function avatar(m){return `<div class="avatar" style="background:${color(m.addr)}" aria-hidden="true">${initials(m.from)}</div>`}
-
+function avatar(m){return `<div class="avatar" style="background:${color(m.addr)}" aria-hidden="true">${esc(initials(m.from))}</div>`}
 function previewText(b){
-  const flat=b.replace(/\s+/g," ").trim();
+  const flat=(b||"").replace(/\s+/g," ").trim();
   if(flat.length<=PREVIEW_CHARS) return {t:flat,cut:false};
   let cut=flat.slice(0,PREVIEW_CHARS); cut=cut.slice(0,cut.lastIndexOf(" ")).replace(/[,.;:!?-]+$/,"");
   return {t:cut+"…",cut:true};
 }
 function headHTML(m){
-  return `<div class="post-head">${avatar(m)}<div class="who"><b>${esc(m.from)}${isTrusted(m)?'<span class="tag trusted">Trusted</span>':''}</b><span class="addr">${esc(m.addr)}</span></div><span class="when">${m.when}</span></div>`;
+  return `<div class="post-head">${avatar(m)}<div class="who"><b>${esc(m.from)}${isTrusted(m)?'<span class="tag trusted">Trusted</span>':''}</b><span class="addr">${esc(m.addr)}</span></div><span class="when">${esc(m.when)}</span></div>`;
 }
-function bannerHTML(m){return m.banner?`<div class="banner" style="background:linear-gradient(135deg,${m.banner.c},${m.banner.c}cc)"><strong>${esc(m.banner.t)}</strong><span>${esc(m.banner.s)}</span></div>`:"";}
+function bannerHTML(m){
+  if(m.banner) return `<div class="banner" style="background:linear-gradient(135deg,${m.banner.c},${m.banner.c}cc)"><strong>${esc(m.banner.t)}</strong><span>${esc(m.banner.s)}</span></div>`;
+  if(m.hero) return `<img class="hero" src="${esc(m.hero)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`;
+  return "";
+}
 function actionsHTML(){return `<button data-act="reply">${ICON.reply}<span>Reply</span></button>
      <button data-act="fwd">${ICON.fwd}<span>Forward</span></button>
      <button data-act="meh">${ICON.meh}<span>Not interested</span></button>
      <button data-act="spam" class="spam">${ICON.spam}<span>Spam</span></button>`;}
 function postHTML(m){
-  const p=previewText(m.body);
+  const p=previewText(m.preview||m.body);
   return `<article class="post${m.read?" read":""}" data-id="${m.id}">
    <div class="open-area" data-act="open" role="button" tabindex="0" aria-label="Open email: ${esc(m.subject)}">
    ${headHTML(m)}
    <h2 class="subject">${m.read?"":'<span class="dot" aria-label="Unread"></span>'}${esc(m.subject)}</h2>
    ${bannerHTML(m)}
-   <p class="preview">${esc(p.t)} <span class="tap">${p.cut?"Open email":"Open"}</span></p>
+   <p class="preview">${esc(p.t)} <span class="tap">${p.cut||m.html?"Open email":"Open"}</span></p>
    </div>
    <div class="actions">${actionsHTML()}</div>
    <div class="slot"></div>
@@ -319,7 +461,7 @@ function slimHTML(m){
   let why="";
   if(r?.kind==="family") why=`Blocked sender family: <mark>${esc(r.text)}</mark>`;
   else if(r?.kind==="topic") why=`Matched muted topics: ${r.hits.map(h=>`<mark>${esc(h)}</mark>`).join(" ")}`;
-  else if(r?.kind==="manual-spam") why=`You marked this as spam`;
+  else if(r?.kind==="manual-spam") why=`You marked this as spam${m.gmailSpam?" (moved to Gmail's Spam folder)":""}`;
   else if(r?.kind==="manual-meh") why=`You marked this as not interested`;
   return `<div class="slim ${m.state==="spam"?"spamrow":""}" data-id="${m.id}">${avatar(m)}
    <div class="t"><b>${esc(m.from)} · <span style="font-weight:400;font-family:var(--mono);font-size:11.5px;color:var(--muted)">${esc(m.addr)}</span></b><em>${esc(m.subject)}</em></div>
@@ -332,37 +474,67 @@ function rulesHTML(){
   const ts=Object.entries(learned.terms).sort((a,b)=>b[1]-a[1]).map(([w,n])=>`<span class="chip">${esc(w)} <span class="w">×${n}</span><button data-rm-term="${esc(w)}" aria-label="Remove ${esc(w)}">×</button></span>`).join("");
   const tr=learned.trusted.map((a,i)=>`<span class="chip">${esc(a)}<button data-rm-trust="${i}" aria-label="Remove ${esc(a)}">×</button></span>`).join("");
   return `<div class="stack">
-   <div class="panel"><h2>Blocked sender families</h2><p class="hint">Marking one email as spam blocks the whole company: sister domains (news.brand.com, brand-mail.com, brandshop.com), look-alike spellings and matching sender names.</p><div class="stack">${fams||'<p class="empty">Nothing blocked yet.</p>'}</div></div>
-   <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email. New mail that hits several of them goes to Filtered instead of your feed. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
+   <div class="panel"><h2>Blocked sender families</h2><p class="hint">Marking one email as spam blocks the whole company: sister domains (news.brand.com, brand-mail.com, brandshop.com), look-alike spellings and matching sender names.${mode==="gmail"?" The email you tap moves to Gmail's Spam folder. Others from that company are held here and left alone in Gmail.":""}</p><div class="stack">${fams||'<p class="empty">Nothing blocked yet.</p>'}</div></div>
+   <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email. New mail that hits several of them goes to Filtered instead of your feed. Nothing changes in Gmail. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
    <div class="panel"><h2>Trusted senders</h2><p class="hint">Anyone you reply to is trusted and never filtered, so real conversations can't get swept up by a promo rule.</p><div class="chips">${tr||'<p class="empty">Reply to someone to trust them.</p>'}</div></div>
-   <button class="btn" data-act="reset" style="align-self:flex-start">Reset everything</button>
+   <p class="hint" style="color:var(--muted);font-size:13px;margin:0">What Mailstream learns is saved in this browser only${mode==="gmail"?`, for ${esc(me)}`:""}.</p>
+   <button class="btn" data-act="reset" style="align-self:flex-start">Reset what it learned</button>
+  </div>`;
+}
+function landingHTML(err){
+  const ready=!!GOOGLE_CLIENT_ID;
+  return `<div class="landing">
+   <h2>Your email, <em>as a feed.</em></h2>
+   <p>Scroll your inbox like a timeline. Tap Spam once and the whole company is gone. Tap Not interested and it learns what you don't want to see.</p>
+   ${err?`<div class="err">${esc(err)}</div>`:""}
+   <div class="row">
+     <button class="btn primary gbtn" data-act="signin" ${ready?"":"disabled"}>${ICON.g}Sign in with Google</button>
+     <button class="btn" data-act="sample">Try it with sample mail</button>
+   </div>
+   ${ready?"":'<p class="fine">Gmail sign-in isn\'t switched on yet. Sample mail works now.</p>'}
+   <p class="fine">Your mail goes straight from Google to this device. There's no Mailstream server, and nobody else, including whoever shared this link, can see your email. What it learns stays in this browser.<br><br>Mailstream is in private testing, so Google will say it "hasn't verified this app." Tap <b>Advanced</b>, then <b>Go to Mailstream</b>. You can remove its access any time at myaccount.google.com/permissions.</p>
   </div>`;
 }
 function counts(){
   ["feed","filtered","spam"].forEach(s=>document.getElementById("c-"+s).textContent=mail.filter(m=>m.state===s).length);
 }
-function render(){
+function render(err){
   const v=document.getElementById("view");
-  document.getElementById("note").hidden = tab!=="feed";
+  document.body.dataset.screen=mode?"app":"landing";
+  const acct=document.getElementById("acct");
+  acct.innerHTML=mode==="gmail"?`${esc(me)} · <b>Sign out</b>`:mode==="sample"?`Sample mail · <b>Exit</b>`:"";
+  document.getElementById("note").hidden = !(mode==="sample" && tab==="feed");
+  if(!mode){ v.innerHTML=landingHTML(err); return; }
   if(tab==="rules"){v.innerHTML=rulesHTML();}
   else{
     const list=mail.filter(m=>m.state===tab);
-    if(tab==="feed") v.innerHTML=list.map(postHTML).join("")+`<p class="endcap">${list.length?"You're caught up.":"Your feed is clear."}</p>`;
+    if(tab==="feed"){
+      if(busy&&!mail.length) v.innerHTML=`<div class="loading"><span class="spin"></span>Loading your inbox…</div>`;
+      else v.innerHTML=list.map(postHTML).join("")+`<p class="endcap">${list.length?(mode==="gmail"?`That's your latest ${FETCH_COUNT} inbox emails.`:"You're caught up."):"Your feed is clear."}</p>`;
+    }
     else v.innerHTML=list.length?list.map(slimHTML).join(""):`<p class="endcap">${tab==="spam"?"No spam held.":"Nothing filtered yet."}</p>`;
   }
   counts();
-  document.getElementById("fab").hidden = pulled || tab!=="feed";
+  const fab=document.getElementById("fab");
+  fab.hidden = tab!=="feed" || (mode==="sample" && pulled);
+  fab.disabled = busy;
+  document.getElementById("fabtxt").textContent = mode==="gmail" ? (busy?"Checking…":"Check for new mail") : "Pull in new mail";
 }
 
 /* ---------- Actions ---------- */
-function toast(msg,undo){
-  const t=document.getElementById("toast");
-  document.getElementById("toastmsg").innerHTML=msg; undoFn=undo||null;
-  document.getElementById("undo").hidden=!undo; t.hidden=false;
-  clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,6000);
+function toast(msg,action){
+  const t=document.getElementById("toast"), b=document.getElementById("undo");
+  document.getElementById("toastmsg").innerHTML=msg;
+  if(typeof action==="function") action={label:"Undo",fn:action};
+  actionFn=action?.fn||null; b.textContent=action?.label||""; b.hidden=!action; t.hidden=false;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,action&&action.label!=="Undo"?15000:6000);
 }
-const snapshot=()=>JSON.stringify({mail,learned});
-const restoreSnap=s=>{const o=JSON.parse(s);mail=o.mail;learned=o.learned;save();render();};
+function handleErr(e,retry){
+  if(e instanceof AuthError) toast("Your Google sign-in timed out. That happens about once an hour.",{label:"Sign in",fn:async()=>{try{await getToken();retry&&retry();}catch(err){toast(esc(err.message));}}});
+  else toast(esc(e.message||String(e)));
+}
+const snapshot=()=>JSON.stringify({mail,learned,held});
+const restoreSnap=s=>{const o=JSON.parse(s);mail=o.mail;learned=o.learned;held=o.held;save();render();};
 function animateOut(ids,done){
   ids.forEach(id=>document.querySelector(`.post[data-id="${id}"]`)?.classList.add("leaving"));
   setTimeout(done,matchMedia("(prefers-reduced-motion:reduce)").matches?0:280);
@@ -374,47 +546,118 @@ function markSpam(m){
   let fam=familyMatch(m)?.f;
   if(!fam){fam={key:brandKey(m.addr),nameKey:nameKey(m.from),label:m.from,example:m.addr,caught:[m.addr]};learned.families.push(fam);}
   const swept=mail.filter(x=>x!==m && screen(x) && x.state==="spam");
+  if(mode==="gmail"){ m.gmailSpam=true; holdRecord(m); }
   save();
+  const undo=()=>{restoreSnap(snap); if(mode==="gmail") modify(m.gid,["INBOX"],["SPAM"]).catch(e=>handleErr(e));};
   animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
-    toast(`Moved to Spam and blocked <b>${esc(m.from)}</b>${swept.length?`. Also pulled ${swept.length} more from the same company.`:"."}`,()=>restoreSnap(snap));});
+    toast(`Moved to Spam and blocked <b>${esc(m.from)}</b>${swept.length?`. Also held back ${swept.length} more from the same company.`:"."}`,undo);});
+  if(mode==="gmail") modify(m.gid,["SPAM"],["INBOX"]).catch(e=>{m.gmailSpam=false;holdRecord(m);save();handleErr(e);});
 }
 function markMeh(m){
   const snap=snapshot();
   m.state="filtered"; m.reason={kind:"manual-meh"};
   const learnedTerms=learnFrom(m);
   const swept=mail.filter(x=>x!==m && x.state==="feed" && screen(x));
+  if(mode==="gmail") holdRecord(m);
   save();
   animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
     toast(`Got it. Muting topics like <b>${learnedTerms.slice(0,3).map(esc).join(", ")}</b>${swept.length?`. ${swept.length} similar email${swept.length>1?"s":""} filtered.`:"."}`,()=>restoreSnap(snap));});
 }
-function openComposer(card,m,kind){
-  const slot=card.querySelector(".slot");
+function openComposer(host,m,kind){
+  const slot=host.querySelector(".slot");
   if(slot.innerHTML){slot.innerHTML="";return;}
-  slot.innerHTML=`<div class="composer"><label for="c-${m.id}">${kind==="reply"?`Reply to ${esc(m.addr)}`:"Forward to"}</label>
-   ${kind==="fwd"?`<textarea id="to-${m.id}" style="min-height:44px" placeholder="name@example.com"></textarea>`:""}
+  const to=parseAddr(m.replyTo||m.addr).addr;
+  slot.innerHTML=`<div class="composer"><label for="c-${m.id}">${kind==="reply"?`Reply to ${esc(to)}`:"Forward to"}</label>
+   ${kind==="fwd"?`<textarea id="to-${m.id}" style="min-height:44px" placeholder="name@example.com" autocomplete="email"></textarea>`:""}
    <textarea id="c-${m.id}" placeholder="${kind==="reply"?"Write your reply…":"Add a note (optional)…"}"></textarea>
+   ${kind==="fwd"&&mode==="gmail"?'<label>Forwards the text of the email. Attachments are not included yet.</label>':""}
+   <p class="err" hidden></p>
    <div class="row"><button class="btn primary" data-act="send" data-kind="${kind}">${kind==="reply"?"Send reply":"Forward"}</button><button class="btn" data-act="cancel">Cancel</button></div></div>`;
   slot.querySelector("textarea").focus();
 }
+function encodeHeader(s){return /^[\x00-\x7F]*$/.test(s)?s:"=?UTF-8?B?"+btoa(unescape(encodeURIComponent(s)))+"?=";}
+function rawMessage(headers,body){
+  const lines=[...Object.entries(headers).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`),"MIME-Version: 1.0",'Content-Type: text/plain; charset="UTF-8"',"Content-Transfer-Encoding: 8bit","",body.replace(/\r?\n/g,"\r\n")].join("\r\n");
+  let bin=""; new TextEncoder().encode(lines).forEach(b=>bin+=String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function sendMail(m,kind,host){
+  const slot=host.querySelector(".slot"), note=slot.querySelector(`#c-${m.id}`).value.trim(), errEl=slot.querySelector(".err"), btn=slot.querySelector('[data-act="send"]');
+  const showErr=t=>{errEl.textContent=t;errEl.hidden=false;};
+  let to;
+  if(kind==="fwd"){ to=slot.querySelector(`#to-${m.id}`).value.trim(); if(!/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(to)) return showErr("Enter one email address to forward to, like name@example.com."); }
+  else { to=parseAddr(m.replyTo||m.addr).addr; if(!note) return showErr("Write something before sending."); }
+  if(mode==="sample"){
+    finishSend(m,kind,host); toast(kind==="reply"?`Reply ready. <b>${esc(m.from)}</b> is now trusted and won't be filtered. (Sample mail doesn't send.)`:"Forward ready. (Sample mail doesn't send.)"); return;
+  }
+  btn.disabled=true; btn.textContent="Sending…";
+  const sent=new Date(m.date).toLocaleString();
+  const subj=kind==="reply"?(/^re:/i.test(m.subject)?m.subject:"Re: "+m.subject):(/^fwd?:/i.test(m.subject)?m.subject:"Fwd: "+m.subject);
+  const body=kind==="reply"
+    ? `${note}\n\nOn ${sent}, ${m.from} <${m.addr}> wrote:\n${m.body.split("\n").map(l=>"> "+l).join("\n")}`
+    : `${note?note+"\n\n":""}---------- Forwarded message ---------\nFrom: ${m.from} <${m.addr}>\nDate: ${m.dateHdr||sent}\nSubject: ${m.subject}\n\n${m.body}`;
+  const headers={To:to,Subject:encodeHeader(subj)};
+  if(kind==="reply"&&m.msgId){headers["In-Reply-To"]=m.msgId;headers.References=(m.refs?m.refs+" ":"")+m.msgId;}
+  try{
+    await api("messages/send",{method:"POST",body:JSON.stringify(kind==="reply"?{raw:rawMessage(headers,body),threadId:m.threadId}:{raw:rawMessage(headers,body)})});
+    finishSend(m,kind,host);
+    toast(kind==="reply"?`Reply sent. <b>${esc(m.from)}</b> is now trusted and won't be filtered.`:`Forwarded to ${esc(to)}.`);
+  }catch(e){btn.disabled=false;btn.textContent=kind==="reply"?"Send reply":"Forward";
+    if(e instanceof AuthError) handleErr(e); else showErr("Couldn't send: "+e.message);}
+}
+function finishSend(m,kind,host){
+  if(kind==="reply"&&!isTrusted(m)){learned.trusted.push(m.addr.toLowerCase());save();}
+  host.querySelector(".slot").innerHTML="";
+  if(reader.hidden) render(); else { const keep=reader.scrollTop; openReader(m); reader.scrollTop=keep; render(); }
+}
 
 const reader=document.getElementById("reader");
+function frameDoc(html){
+  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#111}body{padding:12px;font:16px/1.5 -apple-system,system-ui,sans-serif;word-wrap:break-word;overflow-wrap:anywhere}img{max-width:100%!important;height:auto!important}table{max-width:100%!important}pre{white-space:pre-wrap}</style></head><body>${html}</body></html>`;
+}
 function openReader(m){
-  m.read=true;
+  const wasUnread=!m.read; m.read=true;
   reader.dataset.id=m.id;
+  const content=m.html?`<div class="mailframe"><iframe title="Email from ${esc(m.from)}" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe></div>`:`<div class="fullbody">${esc(m.body)}</div>`;
   reader.innerHTML=`<div class="reader-in"><div class="reader-bar"><button data-act="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to feed</button></div>
-   ${headHTML(m)}<h1 class="subject">${esc(m.subject)}</h1>${bannerHTML(m)}
-   <div class="fullbody">${esc(m.body)}</div><div class="slot"></div></div>
+   ${headHTML(m)}<h1 class="subject">${esc(m.subject)}</h1>${m.html?"":bannerHTML(m)}
+   ${content}<div class="slot"></div></div>
    <div class="actions"><div>${actionsHTML()}</div></div>`;
+  if(m.html){
+    const f=reader.querySelector("iframe");
+    f.addEventListener("load",()=>{try{const d=f.contentDocument;const fit=()=>{f.style.height=d.documentElement.scrollHeight+"px";};fit();new ResizeObserver(fit).observe(d.body);d.querySelectorAll("img").forEach(i=>i.addEventListener("load",fit));}catch(e){f.style.height="70vh";}});
+    f.srcdoc=frameDoc(m.html);
+  }
   reader.hidden=false; document.body.classList.add("locked"); reader.scrollTop=0;
   reader.querySelector('[data-act="close"]').focus();
   const card=document.querySelector(`.post[data-id="${m.id}"]`);
   if(card){card.classList.add("read");card.querySelector(".dot")?.remove();}
+  if(mode==="gmail"&&wasUnread) modify(m.gid,[],["UNREAD"]).catch(()=>{});
 }
 function closeReader(){if(reader.hidden)return;const id=reader.dataset.id;reader.hidden=true;reader.innerHTML="";document.body.classList.remove("locked");document.querySelector(`.post[data-id="${id}"] .open-area`)?.focus();}
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape") closeReader();
   if((e.key==="Enter"||e.key===" ")&&e.target.matches(".open-area")){e.preventDefault();e.target.click();}
 });
+
+/* ---------- Starting and leaving ---------- */
+async function startGmail(){
+  try{
+    await getToken();
+    mode="gmail"; const p=await api("profile"); me=p.emailAddress;
+    learned=load("rules",blank()); held=load("held",{}); mail=[]; uid=0; tab="feed"; selectTab();
+    render(); await refresh(true);
+  }catch(e){ mode=null; token=null; render(e.message); }
+}
+function startSample(){
+  mode="sample"; me=""; learned=load("rules",blank()); held={}; uid=0; mail=sampleMail(INITIAL); mail.forEach(screen); pulled=false; tab="feed"; selectTab(); render();
+}
+function leave(){
+  if(mode==="gmail"&&token&&window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token,()=>{});
+  token=null; mode=null; me=""; mail=[]; closeReader(); render(); window.scrollTo({top:0});
+}
+function selectTab(){document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===tab));}
+
 reader.addEventListener("click",handleAction);
 document.getElementById("view").addEventListener("click",handleAction);
 function handleAction(e){
@@ -423,52 +666,53 @@ function handleAction(e){
   if(b.dataset.rmTerm!==undefined){delete learned.terms[b.dataset.rmTerm];save();render();return;}
   if(b.dataset.rmTrust!==undefined){learned.trusted.splice(+b.dataset.rmTrust,1);save();render();return;}
   const act=b.dataset.act;
-  if(act==="reset"){const snap=snapshot();learned={families:[],terms:{},trusted:[]};uid=0;mail=INITIAL.map(mk);pulled=false;save();render();toast("Reset to the starting sample.",()=>restoreSnap(snap));return;}
+  if(act==="signin"){startGmail();return;}
+  if(act==="sample"){startSample();return;}
+  if(act==="reset"){
+    const snap=snapshot(); learned=blank();
+    if(mode==="sample"){uid=0;mail=sampleMail(INITIAL);pulled=false;held={};}
+    else{ held=Object.fromEntries(Object.entries(held).filter(([,h])=>h.gmailSpam)); mail.forEach(m=>{if(!held[m.gid]){m.state="feed";m.reason=null;}}); }
+    save(); render(); toast("Cleared what it learned.",()=>restoreSnap(snap)); return;
+  }
   const host=b.closest("[data-id]"); if(!host) return;
   if(act==="close"){closeReader();return;}
-  const m=mail.find(x=>x.id==host.dataset.id);
+  const m=mail.find(x=>x.id==host.dataset.id); if(!m) return;
   if(act==="open"){openReader(m);return;}
   if(act==="meh"||act==="spam") closeReader();
   if(act==="reply"||act==="fwd") openComposer(host,m,act);
   else if(act==="cancel") host.querySelector(".slot").innerHTML="";
-  else if(act==="send"){
-    const kind=b.dataset.kind;
-    if(kind==="reply" && !isTrusted(m)){learned.trusted.push(m.addr.toLowerCase());save();}
-    host.querySelector(".slot").innerHTML="";
-    render();
-    toast(kind==="reply"?`Reply ready. <b>${esc(m.from)}</b> is now trusted and won't be filtered. (This prototype doesn't send real mail.)`:"Forward ready. (This prototype doesn't send real mail.)");
-  }
+  else if(act==="send") sendMail(m,b.dataset.kind,host);
   else if(act==="meh") markMeh(m);
   else if(act==="spam") markSpam(m);
   else if(act==="restore"){
     const snap=snapshot();
-    const wasSpam=m.state==="spam";
-    m.state="feed"; m.reason=null;
+    const wasSpam=m.state==="spam", wasGmailSpam=m.gmailSpam;
+    m.state="feed"; m.reason=null; m.gmailSpam=false; if(m.gid) delete held[m.gid];
+    if(m.stub) mail=mail.filter(x=>x!==m);
     if(!isTrusted(m)) learned.trusted.push(m.addr.toLowerCase());
     save(); render();
-    toast(`${wasSpam?"Marked not spam":"Back in your feed"}. <b>${esc(m.addr)}</b> will always reach your feed.`,()=>restoreSnap(snap));
+    toast(`${wasSpam?"Marked not spam":"Back in your feed"}. <b>${esc(m.addr)}</b> will always reach your feed.${m.stub?" It will show up next time you open Mailstream.":""}`,()=>{restoreSnap(snap); if(wasGmailSpam) modify(m.gid,["SPAM"],["INBOX"]).catch(e=>handleErr(e));});
+    if(wasGmailSpam) modify(m.gid,["INBOX"],["SPAM"]).catch(e=>handleErr(e));
   }
 }
 
 document.querySelector(".tabs").addEventListener("click",e=>{
   const b=e.target.closest("button[data-tab]"); if(!b) return;
-  tab=b.dataset.tab;
-  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
-  render(); window.scrollTo({top:0});
+  tab=b.dataset.tab; selectTab(); render(); window.scrollTo({top:0});
 });
+document.getElementById("acct").addEventListener("click",leave);
 document.getElementById("fab").addEventListener("click",()=>{
+  if(mode==="gmail"){refresh(false);window.scrollTo({top:0,behavior:"smooth"});return;}
   pulled=true;
-  const fresh=INCOMING.map(mk);
+  const fresh=sampleMail(INCOMING);
   let caught=0; fresh.forEach(m=>{if(screen(m))caught++;});
   mail=[...fresh,...mail];
   render(); window.scrollTo({top:0,behavior:"smooth"});
   const landed=fresh.length-caught;
   toast(`${fresh.length} new emails. ${landed} reached your feed${caught?`, ${caught} caught by what you've taught it.`:". Teach it with Spam or Not interested, then reset and try again."}`);
 });
-document.getElementById("undo").addEventListener("click",()=>{document.getElementById("toast").hidden=true;if(undoFn)undoFn();});
+document.getElementById("undo").addEventListener("click",()=>{document.getElementById("toast").hidden=true;if(actionFn)actionFn();});
 
-// apply any saved rules to the starting mail
-mail.forEach(screen);
 render();
 </script>
 </body>
