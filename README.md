@@ -2,15 +2,16 @@
 
 Your email as a scrollable feed instead of a list.
 
-Each email shows up as a card, like a post: the sender where a profile picture would be, the subject, and a short preview. Tap a card to open the full email. Every card has six actions: **OK**, **Save**, **Reply**, **Forward**, **Not interested** and **Spam**.
+Each email shows up as a card, like a post: the sender where a profile picture would be, the subject, and a short preview. Tap a card to open the full email. Every card has six actions: **OK**, **Save**, **Reply**, **Delete**, **Not interested** and **Spam**. **Forward** is at the top of the full email.
 
 - **OK** means you've seen it. It archives the email, the same as archiving in Gmail.
+- **Delete** throws it away (to Gmail's Trash) without teaching Mailstream anything.
 - **Save** keeps it for later in the **Saved** tab. In Gmail it's starred, so it also shows up in Gmail's Starred folder.
 
 What makes it different from a regular inbox is that it learns from what you tell it:
 
 - **Spam blocks the whole company, not one address.** Mark one Northline email as spam and it also catches `news.northline.com`, `northline-mail.com`, `northlineoutfitters.com`, look-alike spellings and matching sender names. Personal addresses (Gmail, iCloud and so on) are only ever blocked one address at a time.
-- **Not interested learns topics.** It picks up the key words and phrases from that email, like "flash sale" or "limited time." New mail that matches several of them goes to a **Filtered** tab instead of your feed. Nothing is deleted.
+- **Not interested learns topics, not senders.** It picks up the key words and phrases from the subject and opening, like "flash sale" or "limited time." It ignores the sender's name and platform words like "Substack" or "subscribe," so muting one newsletter's topic doesn't mute every newsletter. New mail that matches several of them goes to a **Filtered** tab instead of your feed. Nothing is deleted.
 - **Anyone you reply to or save from is trusted** and never filtered, so a real conversation can't get swept up by a promo rule.
 - **What it learned** shows every blocked company, muted word and trusted sender, and lets you remove any of them. Every action can be undone.
 

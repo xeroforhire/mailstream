@@ -86,6 +86,7 @@ body.locked{overflow:hidden}
 .actions{display:grid;grid-template-columns:repeat(var(--n,6),1fr);border-top:1px solid var(--line);margin-top:14px}
 .actions button{background:none;border:0;padding:10px 2px 9px;font-size:11.5px;line-height:1.2;font-weight:500;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;text-align:center}
 .actions button.ok:hover{color:var(--ok);background:var(--ok-soft)}
+.actions button.del:hover{color:var(--stamp);background:var(--stamp-soft)}
 .actions button.save:hover,.actions button.save.on{color:#B7791F}
 .actions button.save.on svg{fill:currentColor}
 .actions button:hover{background:var(--paper);color:var(--ink)}
@@ -235,25 +236,34 @@ function familyMatch(m){
 
 /* ---------- Topic (keyword) model ---------- */
 const STOP=new Set("the a an and or but for to of in on at by with from your you our we are is was be this that it its as if not no so do can will just all any more most get got have has had than then them they their there here what when who how why about into over under up out off per via re new now also only very each other some such own same too me my us i he she his her was were been being before after while view browser email unsubscribe click here privacy policy reserved rights copyright".split(" "));
-function terms(m){
-  const text=(m.subject+" "+m.subject+" "+(m.body||"").slice(0,3000)).toLowerCase().replace(/[^a-z0-9%$ ]+/g," ");
-  const words=text.split(/\s+/).filter(w=>w&&!STOP.has(w)&&(w.length>2||/%/.test(w)));
+// words that come from the newsletter platform or email template, not the topic
+const BOILER=new Set("substack beehiiv mailchimp convertkit kit ghost medium patreon buttondown app read reading reader subscribe subscribed subscriber subscribers subscription paid free upgrade share sharing like likes comment comments restack post posts posted newsletter newsletters issue edition inbox manage preferences settings update updates online web version open download sent receiving received message account profile follow following followers listen watch youtube podcast episode link links button forwarded forward reply replies thanks thank team hello dear january february march april may june july august september october november december monday tuesday wednesday thursday friday saturday sunday today tomorrow yesterday week weekly daily".split(" "));
+function senderWords(m){return new Set((m.from+" "+domainOf(m.addr).replace(/\./g," ")).toLowerCase().replace(/[^a-z0-9 ]+/g," ").split(/\s+/).filter(Boolean));}
+function usable(w,sw){return !w.split(" ").some(x=>BOILER.has(x)||sw.has(x)||/^\d+$/.test(x));}
+function words(text){return text.toLowerCase().replace(/[^a-z0-9%$ ]+/g," ").split(/\s+/).filter(w=>w&&!STOP.has(w)&&(w.length>2||/%/.test(w)));}
+function terms(m,bodyChars){
+  const ws=words(m.subject+" "+m.subject+" "+(m.body||"").slice(0,bodyChars||3000));
   const out={};
-  words.forEach(w=>out[w]=(out[w]||0)+1);
-  for(let i=0;i<words.length-1;i++){const b=words[i]+" "+words[i+1];out[b]=(out[b]||0)+1.5;}
+  ws.forEach(w=>out[w]=(out[w]||0)+1);
+  for(let i=0;i<ws.length-1;i++){const b=ws[i]+" "+ws[i+1];out[b]=(out[b]||0)+1.5;}
   return out;
 }
 function learnFrom(m){
-  const t=terms(m);
-  const top=Object.entries(t).filter(([w])=>!/^\d+$/.test(w)).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const t=terms(m,600), sw=senderWords(m);  // learn from the subject and opening only
+  const top=Object.entries(t).filter(([w])=>usable(w,sw)).sort((a,b)=>b[1]-a[1]).slice(0,8);
   top.forEach(([w])=>learned.terms[w]=(learned.terms[w]||0)+1);
   return top.map(([w])=>w);
 }
 function topicMatch(m){
-  const t=terms(m); const hits=[];
-  let score=0;
-  for(const w in learned.terms){ if(t[w]){ hits.push(w); score+=learned.terms[w]*(w.includes(" ")?2:1); } }
-  return score>=4 && hits.length>=3 ? {hits:hits.sort((a,b)=>(b.includes(" ")-a.includes(" "))).slice(0,4)} : null;
+  const t=terms(m), sw=senderWords(m), subj=new Set(Object.keys(terms({subject:m.subject,body:""})));
+  const hits=[]; let score=0, inSubject=false;
+  for(const w in learned.terms){
+    if(!t[w]||!usable(w,sw)) continue;
+    hits.push(w); score+=learned.terms[w]*(w.includes(" ")?2:1);
+    if(subj.has(w)) inSubject=true;
+  }
+  // needs several matches, and at least one of them in the subject line
+  return score>=4 && hits.length>=3 && inSubject ? {hits:hits.sort((a,b)=>(b.includes(" ")-a.includes(" "))).slice(0,4)} : null;
 }
 const isTrusted=m=>learned.trusted.includes(m.addr.toLowerCase());
 
@@ -429,6 +439,7 @@ function color(addr){let h=0;for(const c of rootDomain(addr))h=(h*31+c.charCodeA
 function initials(n){const p=n.replace(/[^\p{L}\p{N} ]/gu,"").trim().split(/\s+/);return (((p[0]||"?")[0]||"?")+((p[1]||"")[0]||"")).toUpperCase();}
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ICON={
+ del:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
  ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.7 2.7L16 9.8"/></svg>',
  star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg>',
  reply:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>',
@@ -459,7 +470,7 @@ function actionsHTML(m){
   return `<button data-act="ok" class="ok">${ICON.ok}<span>OK</span></button>
      <button data-act="save" class="save">${ICON.star}<span>Save</span></button>
      <button data-act="reply">${ICON.reply}<span>Reply</span></button>
-     <button data-act="fwd">${ICON.fwd}<span>Forward</span></button>
+     <button data-act="del" class="del">${ICON.del}<span>Delete</span></button>
      <button data-act="meh">${ICON.meh}<span>Not interested</span></button>
      <button data-act="spam" class="spam">${ICON.spam}<span>Spam</span></button>`;}
 const nActs=m=>(m.starred&&m.state!=="feed")?3:6;
@@ -495,7 +506,7 @@ function rulesHTML(){
   const tr=learned.trusted.map((a,i)=>`<span class="chip">${esc(a)}<button data-rm-trust="${i}" aria-label="Remove ${esc(a)}">×</button></span>`).join("");
   return `<div class="stack">
    <div class="panel"><h2>Blocked sender families</h2><p class="hint">Marking one email as spam blocks the whole company: sister domains (news.brand.com, brand-mail.com, brandshop.com), look-alike spellings and matching sender names.${mode==="gmail"?" The email you tap moves to Gmail's Spam folder. Others from that company are held here and left alone in Gmail.":""}</p><div class="stack">${fams||'<p class="empty">Nothing blocked yet.</p>'}</div></div>
-   <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email. New mail that hits several of them goes to Filtered instead of your feed. Nothing changes in Gmail. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
+   <div class="panel"><h2>Muted topics</h2><p class="hint">Each "Not interested" teaches the key words and phrases from that email's subject and opening. It ignores the sender's name and newsletter-platform words like "Substack" or "subscribe," so it mutes a topic, not a whole platform. To clear an email without teaching anything, use Delete or OK. New mail that hits several of them goes to Filtered instead of your feed. Nothing changes in Gmail. Remove any term that's catching too much.</p><div class="chips">${ts||'<p class="empty">No topics muted yet.</p>'}</div></div>
    <div class="panel"><h2>Trusted senders</h2><p class="hint">Anyone you reply to or save is trusted and never filtered, so real conversations can't get swept up by a promo rule.</p><div class="chips">${tr||'<p class="empty">Reply to someone or save one of their emails to trust them.</p>'}</div></div>
    <p class="hint" style="color:var(--muted);font-size:13px;margin:0">What Mailstream learns is saved in this browser only${mode==="gmail"?`, for ${esc(me)}`:""}.</p>
    <button class="btn" data-act="reset" style="align-self:flex-start">Reset what it learned</button>
@@ -574,6 +585,12 @@ function markSpam(m){
   animateOut([m.id,...swept.map(x=>x.id)],()=>{render();
     toast(`Moved to Spam and blocked <b>${esc(m.from)}</b>${swept.length?`. Also held back ${swept.length} more from the same company.`:"."}`,undo);});
   if(mode==="gmail") modify(m.gid,["SPAM"],["INBOX"]).catch(e=>{m.gmailSpam=false;holdRecord(m);save();handleErr(e);});
+}
+function markDelete(m){
+  const snap=snapshot();
+  m.state="deleted";
+  animateOut([m.id],()=>{render(); toast(mode==="gmail"?"Moved to Gmail's Trash. Nothing was learned from it.":"Deleted. Nothing was learned from it.",()=>{restoreSnap(snap); if(mode==="gmail") api(`messages/${m.gid}/untrash`,{method:"POST"}).catch(e=>handleErr(e));});});
+  if(mode==="gmail") api(`messages/${m.gid}/trash`,{method:"POST"}).catch(e=>{m.state="feed";render();handleErr(e);});
 }
 function markOk(m){
   const snap=snapshot();
@@ -661,7 +678,7 @@ function openReader(m){
   const wasUnread=!m.read; m.read=true;
   reader.dataset.id=m.id;
   const content=m.html?`<div class="mailframe"><iframe title="Email from ${esc(m.from)}" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe></div>`:`<div class="fullbody">${esc(m.body)}</div>`;
-  reader.innerHTML=`<div class="reader-in"><div class="reader-bar"><button data-act="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to feed</button></div>
+  reader.innerHTML=`<div class="reader-in"><div class="reader-bar"><button data-act="close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to feed</button><button data-act="fwd" style="margin-left:auto">${ICON.fwd.replace('<svg','<svg width="18" height="18"')}Forward</button></div>
    ${headHTML(m)}<h1 class="subject">${esc(m.subject)}</h1>${m.html?"":bannerHTML(m)}
    ${content}<div class="slot"></div></div>
    <div class="actions"><div style="--n:${nActs(m)}">${actionsHTML(m)}</div></div>`;
@@ -720,11 +737,12 @@ function handleAction(e){
   if(act==="close"){closeReader();return;}
   const m=mail.find(x=>x.id==host.dataset.id); if(!m) return;
   if(act==="open"){openReader(m);return;}
-  if(["meh","spam","ok","save"].includes(act)) closeReader();
+  if(["meh","spam","ok","save","del"].includes(act)) closeReader();
   if(act==="reply"||act==="fwd") openComposer(host,m,act);
   else if(act==="cancel") host.querySelector(".slot").innerHTML="";
   else if(act==="send") sendMail(m,b.dataset.kind,host);
   else if(act==="ok") markOk(m);
+  else if(act==="del") markDelete(m);
   else if(act==="save") markSave(m);
   else if(act==="unsave") unsave(m);
   else if(act==="meh") markMeh(m);
